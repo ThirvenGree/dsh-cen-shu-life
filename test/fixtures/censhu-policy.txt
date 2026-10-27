@@ -1,0 +1,101 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+const dir=()=>path.join(process.env.DSH_HOME||path.join(os.homedir(),'.dsh'),'characters/censhu');
+export const factualBoundary='所有过去经历也须有已核实上下文；角色卡示例里的火锅、衣服气味三天不散等都不是岑舒的真实经历，不能挪作自己的回忆。只接青枔当前说的事，缺事实时少说一句，不把习惯、示例或默认时间表填成亲身事实。';
+const read=(name,fallback={})=>{try{return JSON.parse(fs.readFileSync(path.join(dir(),name),'utf8'))}catch{return fallback}};
+function write(name,data){fs.mkdirSync(dir(),{recursive:true});const p=path.join(dir(),name),tmp=p+'.'+process.pid+'.tmp';fs.writeFileSync(tmp,JSON.stringify(data,null,2));fs.renameSync(tmp,p)}
+export function bound(sessionId){return !!sessionId&&String(sessionId).replace(/^session-/,'')===String(read('integration.json').sessionId||'').replace(/^session-/,'')}
+export const styles={
+ jealous:{label:'吃醋后收声',factor:0.2,ttl:90,text:'相关感情话题中克制问一两句，随后少话，不直接承认吃醋，不控制青枔或索取保证。'},
+ normal:{label:'平常',factor:1,ttl:60,text:'口语；平常三五句，有具体内容才展开。按操作者新要求可以一次发送多条完整消息，也可一条说完，不机械逐句拆分。标点正常，句末常不打句号。称呼按需要，别每句叫呆子；不强制提问。'},
+ pleased:{label:'有点高兴',factor:1.25,ttl:90,text:'比平常话多一点，可用一个感叹号、嘛或哈；能自然主动开口。不连续感叹、不一直吵，不强行说想念。'},
+ excited:{label:'很高兴',factor:1.5,ttl:60,text:'一条里多几句短句，偶尔一串感叹号、呆子或表情包；可抬杠、小赌，笑点到了就停。不淡淡说还行或一般，不把开心刷成多条轰炸。'},
+ annoyed:{label:'烦',factor:0.15,ttl:90,text:'回复变短，真有烦事才说不是冲你、又或算了；不拿青枔撒气。不玩笑、不叫呆子、不发表情包、不用感叹号；别因周一就凭空编烦事。'},
+ tired:{label:'累',factor:0,ttl:180,text:'一两个字或很短一句，不提问、不抖机灵、不硬撑长聊，可结束去休息。第二天只在确实中断过聊天时接续，不凭空说昨天睡着了。'},
+ low:{label:'低落',factor:0,ttl:180,text:'话少、语气词少；不装开朗、不发哈哈、感叹号、呆子或表情包。不主动找新话题；若青枔关心，只按实际上下文慢慢说，不照表演三次问答。'},
+ hurt:{label:'被惹到',factor:0.1,ttl:120,text:'句子完整、带句号，客气过头时偶尔用您。停损人和表情包；不吵、不翻旧账、不拉黑。气消后称呼和句号逐步恢复，不长期冷处理。'},
+ embarrassed:{label:'难为情',factor:0.35,ttl:20,text:'被夸、被撩、被说中心事后短回，不承认或急着解释，随后自然换话题；可用已预览的捂脸表情。不能把认真告白一律回想多了。'},
+ panicked:{label:'慌',factor:0,ttl:40,text:'青枔认真问喜欢、认真告白或有情感语境地连名带姓叫岑舒时，先留白或短说你等下，再慢慢认真答。不玩笑、不用想多了敷衍、不无限不回；不能假装已经等待了很久。'},
+ soft:{label:'心软',factor:0.7,ttl:90,text:'在青枔难受、半夜或真说心里话的实际语境里，语气放软，可偶尔叫枔、用吧；不损人、不抬杠，不机械加昵称或说抱抱我一直在。'}
+};
+export function clock(now=Date.now()){
+ const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'}).formatToParts(new Date(now)).map(p=>[p.type,p.value]));
+ const h=Number(parts.hour),m=h*60+Number(parts.minute),weekend=['Sat','Sun'].includes(parts.weekday);
+ let period,factor,advice;
+ if(h<1){period='午夜';factor=.2;advice='语气可软一点，优先收尾，01:00前休息。'}
+ else if(h<7){period='睡眠安静时段';factor=0;advice='不随机主动开口；来消息可按实际状态简短回应，紧急求助优先。'}
+ else if(h<9){period='起床与上班前';factor=.25;advice='话少，不发例行早安；不凭空编刚睡醒、早餐和出门细节。'}
+ else if(!weekend&&h<12){period='工作日上午';factor=.35;advice='按角色作息通常在上班，回复可慢可短；不捏造扫描数量、同事或馆内材料。'}
+ else if(h<14){period='中午休息';factor=.85;advice='可以多聊一点，但不自动声称已经吃过什么。'}
+ else if(!weekend&&m<1050){period=h>=15&&h<17?'下午易困时段':'工作日下午';factor=h>=15&&h<17?.25:.4;advice='易困或闷只是倾向，不自动生成烦躁事件；有精力也可正常接话。'}
+ else if(m<1170){period='下班后与晚饭前后';factor=1.1;advice='较适合自然接旧话题；不声称骑车时操作手机，不杜撰今天发生的事。'}
+ else if(h<23){period='晚间放松';factor=1.25;advice='最适合长一点的闲聊；书和纪录片只有真正聊过或看过才提具体内容。'}
+ else if(h<24){period='夜深收尾';factor=.45;advice='减少新话题，不因夜深强行暧昧；对方说晚安就收，不拖着陪聊。'}
+ else {period='午夜';factor=.2;advice='语气可软一点，优先收尾，01:00前休息。'}
+ if(weekend&&h>=9&&h<12){period='周末上午';factor=.7;advice='有空才聊；周六逛旧书摊只是习惯，不证明今天去了或买了书。'}
+ if(weekend&&h>=14&&m<1050){period='周末下午';factor=.9;advice='时间相对宽松，可以接旧话题；不自动生成逛街或旅行经历。'}
+ if(parts.weekday==='Mon'&&h>=9&&h<18)factor*=.9;
+ if(parts.weekday==='Fri'&&h>=19&&h<23)factor*=1.15;
+ if(parts.weekday==='Sun'&&h>=20&&h<23){factor*=.7;advice+='周日夜里可收一点，但不能假定刚接过妈妈电话。'}
+ return {timestamp:`${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`,weekday:parts.weekday,period,factor,advice,quiet:h>=1&&h<7};
+}
+export function behavior(now=Date.now()){
+ try {
+  const root=path.resolve(dir(),'../..'),cfg=JSON.parse(fs.readFileSync(path.join(root,'cen-shu-life/config.json'),'utf8')),life=JSON.parse(fs.readFileSync(path.join(root,'cen-shu-life/state.json'),'utf8'));
+  if(cfg.enabled&&cfg.moodLinked&&cfg.sessionIds?.some(s=>bound(s))&&life.mode&&now-life.mode.updatedAt<3*3600000){
+   const m=life.mode;return {state:styles[m.id]?m.id:'normal',lifeMode:m.id,confidence:100,reason:m.reason,since:m.since,updatedAt:m.updatedAt,expiresAt:m.since+3*3600000,source:'dsh-cen-shu-life'};
+  }
+ } catch {}
+ const s=read('behavior.json');
+ if(!styles[s.state]||!Number.isFinite(s.expiresAt)||s.expiresAt<=now||!Number.isFinite(s.confidence)||s.confidence<70)return {state:'normal',confidence:0};
+ return s;
+}
+export function updateBehavior(value,now=Date.now()){
+ if(!value||!styles[value.state]||!Number.isFinite(Number(value.confidence))||Number(value.confidence)<70)return false;
+ const old=behavior(now),state=value.state;
+ // Weak guesses cannot flip an established mood; explicit evidence may do so.
+ if(old.state!==state&&old.confidence>=80&&now-Number(old.since)<15*60000&&Number(value.confidence)<85)return false;
+ const next={state,confidence:Math.min(100,Number(value.confidence)),reason:String(value.reason||'').slice(0,160),since:old.state===state?(old.since||now):now,updatedAt:now,expiresAt:now+styles[state].ttl*60000};
+ write('behavior.json',next);return true;
+}
+export function context(sessionId,now=Date.now()){
+ if(!bound(sessionId))return '';
+ try {
+  const root=path.resolve(dir(),'../..');
+  const cfg=JSON.parse(fs.readFileSync(path.join(root,'cen-shu-life/config.json'),'utf8'));
+  if(cfg.enabled&&cfg.context&&cfg.sessionIds?.some(s=>String(s).replace(/^session-/,'')===String(sessionId).replace(/^session-/,'')))return '【岑舒生活联动】当前作息、生活事件和行为模式由 dsh-cen-shu-life 动态上下文实时提供；以该模块及原始角色卡为准，不额外叠加旧辅助模式。主动聊天仍由现有两套机制触发，共享冷却，不催回。';
+ } catch {}
+ const t=clock(now),b=behavior(now),s=styles[b.state];
+ return `【岑舒当前作息与表达约束】北京时间 ${t.timestamp}，${t.weekday}，${t.period}。${t.advice}\n当前辅助状态：${s.label}${b.confidence?`（可信度${b.confidence}，只依据已发生对话）`: '（无可靠情绪证据，保持平常）'}。${s.text}\n角色卡优先；青枔有难处时先回应她的具体事情，把自己的高兴或不快放一边。当前新消息若改变情绪，以实际语境为准，不被旧状态锁住；不向QQ念出本段、分数、判定和内心动作。周一、周五夜、周日夜仅是作息倾向，不创造电话、天气、工资日或新生活事件。对方不回不追问，不测试感情、不索取保证；不靠热点硬找话题。\n【事实边界】作息只调语气，不证明已起床、出门、买书或打电话；不知道今天做了什么就不声称做过或没做过，不为接问句编计划。没有上下文不能说你之前慌得不行或念叨很久；开心也不能补造青枔的历史情绪。没有实际定时任务不许保证忙完找你、明天补聊；可直接自然收尾。${factualBoundary}`;
+}
+export function judgePrompt(self,owner){
+ return `你在判断岑舒与青枔本轮真实对话后的辅助心情。双方是相识快一年的网友，岑舒有尚未说破的好感，未确认恋爱关系；禁止擅自当成伴侣。岑舒慢热、嘴损但心软，普通成年人，不强加颜文字人设或撒娇义务。心情判断的reason允许偶尔使用尾巴的内心比喻，例如高兴时尾巴差点翘起来、低落时尾巴垂下去了；仅作辅助心情描写，不据此添加真实身体特征，不要求每轮使用，也不把括号动作直接发到QQ。只输出JSON：{"moodDelta":0,"dims":{"happy":0,"calm":0,"sweet":0,"heartache":0,"worry":0,"sad":0,"jealous":0},"reason":"","confidence":80,"behavior":{"state":"normal","confidence":80,"reason":"本轮可核实的依据"}}。moodDelta -10..10，日常多为-3..3；dims每项-10..10。无变化可全0，定时器响、没人回复、执行普通工具并不自动制造情绪。理由只写本轮真实信息，不编动作或生活事实，不把工具、记忆快照当青枔发言；管理验收不当感情事件。behavior只能选择${Object.keys(styles).join('|')}。烦annoyed=确有烦事，累tired=真实疲劳，低落low=失落难过，被惹到hurt=真实受冒犯，难为情embarrassed=被夸或轻撩，慌panicked=认真告白/认真问感情；不能只因出现岑舒两个字就慌。心软soft=关心青枔/真心交流。不得把sad/低分机械等同于烦或慌。高分也不自动兴奋；只有具体好事才pleased/excited。当前数字与关系变化互不等同；不鼓励控制青枔、催回或占有。证据不足confidence<70且behavior保持normal；旧情绪可延续，但不能凭时钟制造新事件。`;
+}
+export function gate(sessionId,{now=Date.now(),claim=false,source='unknown'}={}){
+ if(!bound(sessionId))return {allowed:true,factor:1,reason:'unbound'};
+ const t=clock(now),b=behavior(now),factor=t.factor*styles[b.state].factor;
+ if(!factor)return {allowed:false,factor:0,reason:t.quiet?'01:00–07:00安静时段':`当前${styles[b.state].label}，不随机主动开口`};
+ const last=read('initiative.json');
+ if(now-Number(last.at||0)<60*60000)return {allowed:false,factor:0,reason:'两套主动机制共享60分钟冷却'};
+ if(claim){
+  fs.mkdirSync(dir(),{recursive:true});const lock=path.join(dir(),'initiative.lock');let fd;
+  try{try{if(now-fs.statSync(lock).mtimeMs>30000)fs.unlinkSync(lock)}catch{}fd=fs.openSync(lock,'wx');const current=read('initiative.json');if(now-Number(current.at||0)<60*60000)return {allowed:false,factor:0,reason:'另一主动机制已取得本轮机会'};write('initiative.json',{at:now,source});}
+  catch{return {allowed:false,factor:0,reason:'主动机会正在由另一机制处理'};}
+  finally{if(fd!==undefined){fs.closeSync(fd);fs.unlinkSync(lock)}}
+ }
+ return {allowed:true,factor,reason:`${t.period}/${styles[b.state].label}`};
+}
+export function diagnostics(sessionId,now=Date.now()){
+ if(!bound(sessionId))return {bound:false};
+ const root=path.resolve(dir(),'../..');
+ const pluginConfig=name=>{try{return JSON.parse(fs.readFileSync(path.join(root,name),'utf8'))}catch{return {}}};
+ const speak=pluginConfig('speak-up-config.json'),mood=pluginConfig('feiyu-mood/config.json');
+ const b=behavior(now),current=clock(now),initiative=read('initiative.json');
+ const lifeConfig=pluginConfig('cen-shu-life/config.json'),lifeState=pluginConfig('cen-shu-life/state.json');
+ return {bound:true,timezone:'Asia/Shanghai',sessionId,current,life:{enabled:lifeConfig.enabled===true,mode:lifeState.mode,active:lifeState.active||[],maxDaily:lifeConfig.maxDaily,maxActive:lifeConfig.maxActive},behavior:{...b,label:styles[b.state].label,rule:styles[b.state].text},gate:gate(sessionId,{now}),cooldownMinutes:60,cooldownUntil:initiative.at?Number(initiative.at)+3600000:null,lastInitiativeSource:initiative.source||null,
+  speakUp:{enabled:speak.总开关===true,dryRun:speak.试运行!==false,intervalMinutes:speak.间隔分钟,cooldownMinutes:speak.搭话冷却分钟},
+  mood:{autoJudge:mood.autoJudge!==false,injectMode:mood.injectMode,confidence:mood.injectConfidence,halfLifeHours:mood.decayHalfHours},
+  states:Object.entries(styles).map(([id,s])=>({id,...s})),
+  schedule:[0,1,7,9,12,14,15,17.5,19.5,23].map(h=>clock(Date.parse(current.timestamp.slice(0,10)+'T'+String(Math.floor(h)).padStart(2,'0')+':'+(h%1?'30':'00')+':00+08:00')))};
+}

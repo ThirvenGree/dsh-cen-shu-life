@@ -1,6 +1,6 @@
 {
   "name": "dsh-cen-shu-life",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "type": "module",
   "description": "岑舒日常生活、随机事件与只读心情行为联动",
   "license": "MIT",
@@ -9,7 +9,8 @@
     ".": "./lib/host.js",
     "./client": "./client.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./mood-link": "./lib/mood-link.js"
+    "./mood-link": "./lib/mood-link.js",
+    "./weather-policy": "./lib/weather-policy.js"
   },
   "files": [
     "lib",
@@ -24,7 +25,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check lib/engine.js && node --check lib/host.js && node --check client.js && node --check lib/mood-link.js && node --check scripts/install-mood-link.mjs && node --check lib/situation.js && node --check lib/content-evolution.js && node --check lib/defaults-store.js && node --check lib/adapter-health.js && node --check lib/request-guard.js"
+    "check": "node --check lib/engine.js && node --check lib/host.js && node --check client.js && node --check lib/mood-link.js && node --check scripts/install-mood-link.mjs && node --check lib/situation.js && node --check lib/content-evolution.js && node --check lib/defaults-store.js && node --check lib/adapter-health.js && node --check lib/request-guard.js && node --check lib/weather.js && node --check lib/weather-policy.js && node --check scripts/install-weather-policy.mjs"
   },
   "dsh": {
     "bundle": {
