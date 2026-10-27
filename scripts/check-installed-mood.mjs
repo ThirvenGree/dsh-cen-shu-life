@@ -19,7 +19,8 @@ const flush=async()=>{for(let i=0;i<25;i++)await new Promise(r=>setImmediate(r))
 try{
  apply(ctx);listeners.get('agent/turn-stopping')();await flush();let mood=readMood(home,engine.config,sid);
  assert.equal(calls.length,1);assert.match(calls[0].system,/岑舒生活事件输入/);assert.equal(mood.mood,71);assert.equal(mood.dims.happy,6);assert.equal(mood.lifeEventReceipts.length,1);assert.match(engine.context(sid),/当前行为模式：有点高兴/);
- const once={mood:mood.mood,happy:mood.dims.happy};listeners.get('agent/turn-stopping')();await flush();mood=readMood(home,engine.config,sid);assert.equal(calls.length,2);assert.doesNotMatch(calls[1].system,/岑舒生活事件输入/);assert.equal(mood.mood,once.mood);assert.equal(mood.dims.happy,once.happy);
+ engine.storeSituation(sid,{version:1,confidence:95,needsCare:true,careResolved:false,confession:false,offense:false,flirt:false,romance:false});
+ const once={mood:mood.mood,happy:mood.dims.happy};listeners.get('agent/turn-stopping')();await flush();mood=readMood(home,engine.config,sid);assert.equal(calls.length,2);assert.doesNotMatch(calls[1].system,/岑舒生活事件输入/);assert.equal(mood.mood,once.mood);assert.equal(mood.dims.happy,once.happy);assert.equal(mood.situation.needsCare,true);
  const req=Readable.from(['{}']);req.url='/dsh-feiyu-mood/reset?key=censhu';req.method='POST';await routes.get('/dsh-feiyu-mood/reset')(req,{writeHead(){},end(){}});const reset=helpers.读一份('censhu');assert.ok(reset.lifeEventReceipts.includes(engine.moodEvents.events[0].id));assert.equal(readLifeMoodInputs(home,sid,'censhu',reset).length,0);
- console.log(JSON.stringify({nativeMoodWriter:true,firstJudgmentCalls:1,totalNormalTurns:2,totalCalls:calls.length,onceOnly:true,realMood:once.mood,realHappy:once.happy,behavior:'pleased',resetPreventsReplay:true}));
+ console.log(JSON.stringify({nativeMoodWriter:true,firstJudgmentCalls:1,totalNormalTurns:2,totalCalls:calls.length,onceOnly:true,realMood:once.mood,realHappy:once.happy,behavior:'pleased',resetPreventsReplay:true,structuredContextPersistsOnZeroDelta:true}));
 }finally{for(const off of effects.reverse())off();fs.rmSync(home,{recursive:true,force:true});}

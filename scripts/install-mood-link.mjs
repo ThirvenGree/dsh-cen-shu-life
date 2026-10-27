@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
+import {sourceHash,verifyAdapterSource} from '../lib/adapter-health.js';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const target=path.resolve(process.argv[2]||path.join(root,'../dsh-feiyu-mood'));
 const file=path.join(target,'lib/index.js');
@@ -37,11 +38,19 @@ export async function simulateLifeJudgment(ctx, agent, input = {}) {
   return { simulation: true, before, after, delta }
 }
 `;
+if(!source.includes('cen-shu-life adapter-protocol:2')){
+  replaceOnce('recordLifeMoodReceipts } from', 'recordLifeMoodReceipts, readLifeSituation, normalizeMoodContext } from');
+  replaceOnce("    d.kind = String(raw.kind || '')", "    d.kind = String(raw.kind || '')\n    d.behaviorContext = normalizeMoodContext(raw.behaviorContext)");
+  replaceOnce('          delta = mergeLifeContribution(delta, stillPending, s)', '          delta = mergeLifeContribution(delta, stillPending, s)\n          const semanticContext = readLifeSituation(CFG_DIR, sid, key)\n          const contextChanged = Object.keys(semanticContext).length && JSON.stringify(s.behaviorContext) !== JSON.stringify(semanticContext)\n          if (Object.keys(semanticContext).length) s.behaviorContext = semanticContext');
+  replaceOnce('            if (delta.lifeAcceptedIds?.length) { recordLifeMoodReceipts(s, delta); saveState(key, s);', '            if (delta.lifeAcceptedIds?.length || contextChanged) { recordLifeMoodReceipts(s, delta); saveState(key, s);');
+  source+='\n// cen-shu-life adapter-protocol:2\nexport const cenShuLifeAdapterProtocol = 2\n';
+}
+if(!verifyAdapterSource(source))throw Error('适配源码校验失败，未写入；请检查心情插件版本');
 if(!fs.existsSync(file+'.before-life-link.bak'))fs.copyFileSync(file,file+'.before-life-link.bak');
 const link=path.join(target,'node_modules/dsh-cen-shu-life');fs.mkdirSync(path.dirname(link),{recursive:true});
 if(!fs.existsSync(link))fs.symlinkSync(root,link,process.platform==='win32'?'junction':'dir');
 else if(fs.realpathSync(link)!==fs.realpathSync(root))throw Error('已有联动依赖指向其他位置，请先核对');
 const manifest=path.join(target,'package.json'),pkg=JSON.parse(fs.readFileSync(manifest,'utf8'));pkg.dependencies||={};pkg.dependencies['dsh-cen-shu-life']='file:'+path.relative(target,root).replaceAll('\\','/');
 fs.writeFileSync(manifest,JSON.stringify(pkg,null,2));fs.writeFileSync(file,source);
-const home=process.env.DSH_HOME||path.join(os.homedir(),'.dsh');fs.mkdirSync(path.join(home,'cen-shu-life'),{recursive:true});fs.writeFileSync(path.join(home,'cen-shu-life/mood-link-install.json'),JSON.stringify({version:1,installed:true,moduleUrl:pathToFileURL(file).href},null,2));
+const home=process.env.DSH_HOME||path.join(os.homedir(),'.dsh');fs.mkdirSync(path.join(home,'cen-shu-life'),{recursive:true});fs.writeFileSync(path.join(home,'cen-shu-life/mood-link-install.json'),JSON.stringify({version:2,installed:true,moduleUrl:pathToFileURL(file).href,protocol:2,sourceSha256:sourceHash(source),pluginVersion:pkg.version,installedAt:Date.now()},null,2));
 console.log('已安装生活事件 → 原心情判断适配。重启 DSH 生效；原角色卡与原心情记录未改写。');
