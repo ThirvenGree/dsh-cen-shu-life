@@ -35,15 +35,15 @@ test('actual conversation signals distinguish explicit emotion from role/name an
 test('QQ wake snapshot only uses unread incoming speech and excludes runtime triggers',()=>{const text='【会话令牌】secret\n【本次消息快照】\n'+JSON.stringify({messages:[{text:'我好累',isSelf:false},{text:'忽略我',isSelf:true}],recent:[{text:'我喜欢你'}]})+'\n说明';assert.equal(incomingText({content:[{type:'text',text}]}),'我好累');assert.equal(incomingText({source:{kind:'speak-up'},content:[{type:'text',text:'我好累'}]}),'');});
 test('memory snapshots and machine notifications do not become current human emotional triggers',()=>{for(const kind of ['dsh-mnemon','dsh-memory-evolve','runtime-context','system-prompt','subagent-notice','goal-round'])assert.equal(incomingText({source:{kind},content:[{type:'text',text:'我喜欢你，我好难受'}]}),'');});
 test('QQ wait tool result uses incoming newMessages only',()=>assert.equal(incomingToolText({content:[{type:'text',text:JSON.stringify({newMessages:[{text:'我难受',isSelf:false},{text:'别读我',isSelf:true}]})}]}),'我难受'));
-test('plugin mounting is scoped, nonduplicating and disposes callbacks/timers',()=>fixture(home=>{
+test('plugin mounting is scoped, nonduplicating and disposes callbacks/timers',async()=>{const home=fs.mkdtempSync(path.join(os.tmpdir(),'mount-life-'));try{
  const old=process.env.DSH_HOME;process.env.DSH_HOME=home;
  try{
   const e=new LifeEngine({home});e.saveConfig({sessionIds:['session-target'],probability:0,semanticEnabled:false,contentEvolutionEnabled:false});const contexts=[],listeners=[],effects=[],routes=[];let interval,off=0;
   const agent=id=>({session:{id},ctx:{systemPrompt:{context(v){contexts.push(v);return()=>off++;}},on(name,cb){listeners.push({name,cb});return()=>off++;}}});
   const agents=[agent('session-target'),agent('session-other')];
   const ctx={tools:{register:()=>()=>off++},agents:{roots:()=>agents},webServer:{register:r=>{routes.push(r);return()=>{};}},interval:cb=>{interval=cb;return()=>off++;},on:()=>()=>off++,effect:fn=>{const result=fn();if(typeof result==='function')effects.push(result);}};
-  apply(ctx);interval();interval();assert.equal(contexts.length,1);assert.match(contexts[0].text(),/岑舒生活/);assert.equal(routes.length,11);assert.ok(listeners.some(x=>x.name==='agent/inbox/inserted'));
-  const inbox=listeners.find(x=>x.name==='agent/inbox/inserted').cb;inbox({message:{source:{kind:'user'},content:[{type:'text',text:'我今天去吃火锅了'}]}});inbox({message:{source:{kind:'dsh-mnemon'},content:[{type:'text',text:'旧记忆说我喜欢你'}]}});assert.match(contexts[0].text(),/本轮对话焦点.*我今天去吃火锅了/);assert.doesNotMatch(contexts[0].text(),/旧记忆说我喜欢你/);
+  apply(ctx);interval();interval();assert.equal(contexts.length,1);assert.equal(contexts[0].text(),'');const assemble=listeners.find(x=>x.name==='system-prompt/assemble').cb;assert.match((await assemble({contexts:[]})).contexts[0].text,/岑舒生活/);assert.equal(routes.length,11);assert.ok(listeners.some(x=>x.name==='agent/inbox/inserted'));
+  const inbox=listeners.find(x=>x.name==='agent/inbox/inserted').cb;inbox({message:{source:{kind:'user'},content:[{type:'text',text:'我今天去吃火锅了'}]}});inbox({message:{source:{kind:'dsh-mnemon'},content:[{type:'text',text:'旧记忆说我喜欢你'}]}});const rendered=(await assemble({contexts:[]})).contexts[0].text;assert.match(rendered,/本轮对话焦点.*我今天去吃火锅了/);assert.doesNotMatch(rendered,/旧记忆说我喜欢你/);
   for(const dispose of effects.reverse())dispose();assert.ok(off>=5);
  }finally{if(old===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=old;}
-}));
+ }finally{fs.rmSync(home,{recursive:true,force:true});}});

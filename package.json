@@ -1,6 +1,6 @@
 {
   "name": "dsh-cen-shu-life",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "description": "岑舒日常生活、随机事件与只读心情行为联动",
   "license": "MIT",
@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check lib/engine.js && node --check lib/host.js && node --check client.js && node --check lib/mood-link.js && node --check scripts/install-mood-link.mjs && node --check lib/situation.js && node --check lib/content-evolution.js && node --check lib/defaults-store.js && node --check lib/adapter-health.js"
+    "check": "node --check lib/engine.js && node --check lib/host.js && node --check client.js && node --check lib/mood-link.js && node --check scripts/install-mood-link.mjs && node --check lib/situation.js && node --check lib/content-evolution.js && node --check lib/defaults-store.js && node --check lib/adapter-health.js && node --check lib/request-guard.js"
   },
   "dsh": {
     "bundle": {

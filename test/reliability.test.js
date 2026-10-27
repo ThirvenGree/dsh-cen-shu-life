@@ -31,7 +31,7 @@ test('state reads never roll events, advance stages, change modes, write files o
 }));
 test('adapter health reports overwrite and hash drift without modifying anything',()=>fixture(home=>{
  const dir=path.join(home,'cen-shu-life'),root=path.join(home,'mood/lib');fs.mkdirSync(dir);fs.mkdirSync(root,{recursive:true});const file=path.join(root,'index.js');
- const source='// cen-shu-life adapter-protocol:2\nreadLifeMoodInputs(CFG_DIR\nreadLifeSituation(CFG_DIR\nmergeLifeContribution(delta\nrecordLifeMoodReceipts(s, delta)\nd.lifeEventReceipts =\nd.behaviorContext =\ns.behaviorContext =\nlife: obj.life\nexport const cenShuLifeAdapterProtocol = 2';assert.equal(verifyAdapterSource(source),true);fs.writeFileSync(file,source);fs.writeFileSync(path.join(dir,'mood-link-install.json'),JSON.stringify({protocol:2,moduleUrl:pathToFileURL(file).href,sourceSha256:sourceHash(source),installedAt:10}));
+ const source='// cen-shu-life adapter-protocol:3\nreadLifeMoodInputs(CFG_DIR\nreadLifeSituation(CFG_DIR\nmergeLifeContribution(delta\nrecordLifeMoodReceipts(s, delta)\nd.lifeEventReceipts =\nd.behaviorContext =\ns.behaviorContext =\nlife: obj.life\nexport const cenShuLifeAdapterProtocol = 3';assert.equal(verifyAdapterSource(source),true);fs.writeFileSync(file,source);fs.writeFileSync(path.join(dir,'mood-link-install.json'),JSON.stringify({protocol:3,moduleUrl:pathToFileURL(file).href,sourceSha256:sourceHash(source),installedAt:10}));
  assert.equal(adapterHealth(home,{startedAt:5}).code,'restart_required');assert.equal(adapterHealth(home,{startedAt:20}).ready,true);fs.appendFileSync(file,'\n// upgrade');assert.equal(adapterHealth(home).code,'source_changed');fs.writeFileSync(file,'export const upgraded = true');const before=files(dir);assert.equal(adapterHealth(home).code,'adapter_missing');assert.deepEqual(files(dir),before);
 }));
 test('semantic classification deduplicates in-flight work and caches per session and text',async()=>{
@@ -39,7 +39,7 @@ test('semantic classification deduplicates in-flight work and caches per session
  const [a,b]=await Promise.all([classifier.resolve('one','我很喜欢你',cfg),classifier.resolve('one','我很喜欢你',cfg)]);assert.equal(a.confession,true);assert.deepEqual(a,b);await classifier.resolve('one','我很喜欢你',cfg);assert.equal(calls,1);await classifier.resolve('two','我很喜欢你',cfg);assert.equal(calls,2);
 });
 test('semantic errors, malformed results and timeout use visible conservative fallback',async()=>{
- for(const classify of [async()=>{throw Error('HTTP 404 model missing');},async()=>({reason:'invalid free text'}),async()=>new Promise(()=>{})]){const c=new SituationClassifier({classify});const x=await c.resolve('one','我好喜欢你',{semanticEnabled:true,semanticModel:'gemini-3.8-flash',semanticCacheMinutes:15,semanticTimeoutMs:15});assert.equal(x.confession,true);assert.equal(x.source,'rules-fallback');assert.equal(c.status.state,'degraded');}
+ for(const classify of [async()=>{throw Error('HTTP 404 model missing');},async()=>({reason:'invalid free text'}),async()=>new Promise(()=>{})]){const c=new SituationClassifier({classify});const x=await c.resolve('one','我好喜欢你',{semanticEnabled:true,semanticModel:'gemini-3.8-flash',semanticCacheMinutes:15,semanticTimeoutMs:15});assert.equal(x.confession,false);assert.equal(x.confidence,0);assert.equal(x.source,'unavailable');assert.equal(c.status.state,'degraded');}
  assert.throws(()=>validateSituation({version:1,confidence:90,reason:'太累'}));
 });
 test('Google client uses exact selected model, strict schema and existing environment key without exposing it',async()=>{
