@@ -22,6 +22,14 @@ node scripts/install.mjs "你的DSH家目录/profiles/desktop" "你的岑舒会�
 
 实际安装版本的 `/dsh-feiyu-mood/state` 调用会执行 `getState(... persist:true)`，不是无副作用的跨插件读取。因此采用只读 v2 文件适配器；验证版本、七维数值与明确会话绑定，读取失败保持平常并记日志。文件更新异常不会写回原心情。不读取或覆盖整份聊天历史。
 
+## 插件内设定与工具联动（1.1）
+
+人物背景、一般说话方式、关系边界、每周倾向及工具协作规则保存在本地 `profile.json`；11 种模式的表达规则保存在 `config.json.modeRules`。首次使用的默认规则来自 `data/behaviors.json`，不是测试消息中的长提示词。DSH 设置 → 岑舒生活，可在现代化面板中直接编辑并保存，下一轮立即读取。原始角色卡保持只读。
+
+`censhu_life_context` 是绑定角色专用的状态读取工具；每轮也通过动态上下文自动读取，不依赖模型记得调用。工具仍按已有配置工作：BrowserSkill 路由、文件/图片/表情预览、语音、生图和记忆不会被生活模式禁用。心情只调表达，明确任务仍需完整完成。API 密钥仍在原环境变量中，不复制到本插件。
+
+测试会话通过 `/simulate/session` 临时挂载隔离的模拟上下文，聊天里只传真实测试发言，不贴整段角色设定。模拟绑定只存内存，20 分钟过期，禁止覆盖正式角色会话，可主动清除。
+
 ## 功能
 
 - 上海时区日程，可修改；工作日与周末分开，春节按农历判断。
@@ -51,6 +59,8 @@ node scripts/install.mjs "你的DSH家目录/profiles/desktop" "你的岑舒会�
 | GET | `/dsh-cen-shu-life/settings` | 独立设置页面 |
 | GET | `/dsh-cen-shu-life/state` | 状态、心情读取结果、上下文与模板 |
 | GET/POST | `/dsh-cen-shu-life/config` | 读取/保存设置 |
+| GET/POST | `/dsh-cen-shu-life/profile` | 读取/保存人物与工具联动设定 |
+| POST | `/dsh-cen-shu-life/simulate/session` | 独立测试会话的临时模拟绑定/清除 |
 | POST | `/dsh-cen-shu-life/event` | `{action:"add",templateId}`、`{action:"end",id}`、`{action:"reset"}` |
 | POST | `/dsh-cen-shu-life/simulate` | 独立心情、场景、日程与事件模拟，不修改真实状态 |
 
