@@ -38,17 +38,17 @@ test('Google key reader is async, cached and coalesces registry misses; env wins
  let missed=0;const miss=createGoogleKeyReader({env:{},platform:'win32',run:async()=>{missed++;throw Error('absent');}});await miss();await miss();assert.equal(missed,2);
  const envReader=createGoogleKeyReader({env:{GEMINI_API_KEY:'synthetic'},platform:'win32',run:()=>{throw Error('must not spawn');}});assert.equal(await envReader(),'synthetic');
 });
-test('unknown and legacy fallback records never enter native mood; trusted false clears them',()=>fixture(home=>{
+test('unknown results preserve trusted evidence and legacy fallback records are rejected',()=>fixture(home=>{
  const e=new LifeEngine({home,now:()=>at});e.saveConfig({sessionIds:['target']});e.storeSituation('target',signal({confession:true}));assert.equal(readLifeSituation(home,'target','censhu',at).confession,true);
- e.storeSituation('target',{...signal({confession:true}),source:'rules-fallback'});assert.deepEqual(readLifeSituation(home,'target','censhu',at),{});assert.equal(e.situations.records.target.value,null);
- e.storeSituation('target',signal());assert.equal(readLifeSituation(home,'target','censhu',at).confession,false);
+ e.storeSituation('target',{...signal({confession:true}),source:'rules-fallback'});assert.equal(readLifeSituation(home,'target','censhu',at).confession,true);
+ e.storeSituation('target',signal({resolvedModes:['panicked']}));assert.equal(readLifeSituation(home,'target','censhu',at).confession,false);
  fs.writeFileSync(path.join(e.dir,'semantic-situations.json'),JSON.stringify({version:1,records:{target:{at,value:signal({confidence:70,confession:true})}}}));assert.deepEqual(readLifeSituation(home,'target','censhu',at),{});
 }));
 test('semantic corrections immediately release contextual hold and recovery',()=>{
  const mood={ok:true,confidence:95,updatedAt:at,mood:70,baseline:70,dims:{}};
  const previous=chooseMode({mood,now:at,dialogue:signal({confession:true})});assert.equal(previous.id,'panicked');
- for(const dialogue of [signal(),unknownSituation('pending'),unknownSituation('unavailable')]){const next=chooseMode({mood,now:at+1000,previous,dialogue});assert.equal(next.id,'normal');assert.equal(next.recovering,false);}
- const recovering={...previous,recovering:true,releaseAt:at+1800000};assert.equal(chooseMode({mood,now:at+5000,previous:recovering,dialogue:signal()}).id,'normal');
+ for(const dialogue of [signal({resolvedModes:['panicked']})]){const next=chooseMode({mood,now:at+1000,previous,dialogue});assert.equal(next.id,'normal');assert.equal(next.recovering,false);}
+ const recovering={...previous,recovering:true,releaseAt:at+1800000};assert.equal(chooseMode({mood,now:at+5000,previous:recovering,dialogue:signal({resolvedModes:['panicked']})}).id,'normal');
 });
 test('modification guard rejects rebind, CSRF, foreign origins, ports and nonlocal peers',()=>{
  let now=0;const g=createRequestGuard({now:()=>now});const req=(patch={})=>({method:'POST',headers:{host:'127.0.0.1:3100','x-censhu-csrf':g.token,...patch},socket:{localPort:3100,remoteAddress:'127.0.0.1'}});
