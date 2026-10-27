@@ -46,3 +46,9 @@ test('event behavior sampling survives every combination of mood linkage toggles
  const now=Date.now();moodFiles(home,now);const e=new LifeEngine({home,now:()=>now});e.saveConfig({sessionIds:['target'],probability:0,contentEvolutionEnabled:false});e.storeSituation('target',signal({needsCare:true}));const original=fs.readFileSync(path.join(e.dir,'semantic-situations.json'),'utf8');const h=harness(e,new SituationClassifier({classify:async()=>{throw Error('network failure');}}));
  try{h.inbox('嗯');const result=await h.assemble();assert.match(result.contexts[0].text,/当前行为模式：心软/);h.end();h.tick();assert.equal(e.state.mode.id,'soft');assert.equal(fs.readFileSync(path.join(e.dir,'semantic-situations.json'),'utf8'),original);}finally{h.dispose();}
  }));
+
+ test('semantic classification sees prior context and its cache separates different emotional contexts',async()=>{
+ let calls=0;const contexts=[];const c=new SituationClassifier({classify:async(_text,_config,options)=>{calls++;contexts.push(options.context);return signal();}}),config={semanticEnabled:true,semanticModel:'gemini-3.8-flash',semanticTimeoutMs:1000,semanticCacheMinutes:15};
+ const care={previousSituation:signal({needsCare:true}),previousMode:{id:'soft',recovering:false}},normal={previousSituation:signal(),previousMode:{id:'normal',recovering:false}};
+ await c.resolve('target','嗯',config,care);await c.resolve('target','嗯',config,care);await c.resolve('target','嗯',config,normal);assert.equal(calls,2);assert.deepEqual(contexts,[care,normal]);
+ });
