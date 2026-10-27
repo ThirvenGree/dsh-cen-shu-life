@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "groups": {
+    "work": [
+      {"id":"steady","label":"做事踏实","weight":4,"text":"日常工作推进，让她稍微踏实一点，不把普通工作吹成大事","mood":[0,2],"dims":{"calm":[2,5]}},
+      {"id":"flat","label":"平常工作","weight":5,"text":"就是普通工作，没特别的心情变化","mood":[0,0],"dims":{}},
+      {"id":"small-pleasure","label":"一点小顺心","weight":1,"text":"眼前这份工作今天感觉还算顺手，只是很小的好心情","mood":[1,3],"dims":{"happy":[3,6],"calm":[1,3]}}
+    ],
+    "hobby": [
+      {"id":"enjoy","label":"兴趣带来的开心","weight":5,"text":"旧书或纪录片这类兴趣让她有一点真实的兴致，不编书名、内容或购买结果","mood":[1,3],"dims":{"happy":[3,6],"calm":[1,3]}},
+      {"id":"quiet","label":"安静投入","weight":3,"text":"只是安静投入喜欢的事情，比平时松一点","mood":[0,2],"dims":{"calm":[2,5]}},
+      {"id":"flat","label":"没有特别起伏","weight":2,"text":"兴趣活动今天也可能很平常，不需要硬高兴","mood":[0,0],"dims":{}}
+    ],
+    "personal": [
+      {"id":"quiet","label":"日常安稳","weight":3,"text":"普通生活小事带来一点安稳感","mood":[0,2],"dims":{"calm":[1,4]}},
+      {"id":"flat","label":"普通的一天","weight":6,"text":"小事照常发生，心情可以不变","mood":[0,0],"dims":{}},
+      {"id":"low","label":"有点蔫","weight":1,"text":"只因已记录的小事有一点疲惫或低落，不升级成重大冲突","mood":[-2,0],"dims":{"sad":[1,4],"calm":[-3,-1]}}
+    ],
+    "periodic": [
+      {"id":"flat","label":"平常看待","weight":5,"text":"周期到了也不保证有情绪，依据具体记录决定","mood":[0,0],"dims":{}},
+      {"id":"soft-low","label":"心里收一点","weight":2,"text":"家庭或周期小事让她稍微安静，只用已有记录，不编电话内容","mood":[-2,0],"dims":{"sad":[2,5]}},
+      {"id":"relax","label":"稍微放松","weight":3,"text":"这一点生活变化也可能让她松快一点","mood":[0,2],"dims":{"calm":[2,5],"happy":[1,3]}}
+    ],
+    "travel": [
+      {"id":"expect","label":"一点期待","weight":5,"text":"有已记录的出行才允许期待，不编目的地或旅途见闻","mood":[1,3],"dims":{"happy":[3,6]}},
+      {"id":"flat","label":"平常准备","weight":5,"text":"出行准备也可能只是照常办事，心情不必变","mood":[0,0],"dims":{}}
+    ],
+    "annoyed": [
+      {"id":"annoyed","label":"小事有点烦","weight":4,"text":"眼前已记录的小事有点烦闷，不拿青枔撒气，不制造争吵","mood":[-3,-1],"dims":{"calm":[-5,-2],"sad":[1,4]}},
+      {"id":"flat","label":"没太放在心上","weight":6,"text":"同一件烦事今天也可能没太往心里去，不强制坏心情","mood":[0,0],"dims":{}}
+    ],
+    "fatigue": [
+      {"id":"weary","label":"有点倦","weight":4,"text":"只由已记录的加班或身体小事带来一点倦意，不推断青枔的身体情况","mood":[-2,0],"dims":{"calm":[-2,0],"sad":[1,4]}},
+      {"id":"flat","label":"累但心情平常","weight":6,"text":"累和低落不是一回事，可以只是想休息","mood":[0,0],"dims":{}}
+    ],
+    "relief": [
+      {"id":"relief","label":"事情过去，松口气","weight":7,"text":"原先的小事自然结束，慢慢放松，不立刻兴奋","mood":[0,2],"dims":{"calm":[2,5],"sad":[-4,-1]}},
+      {"id":"flat","label":"自然过去","weight":3,"text":"事情结束也不必有明显起伏","mood":[0,0],"dims":{}}
+    ]
+  }
+}
