@@ -1,0 +1,547 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "id": "scan",
+      "name": "扫描老照片",
+      "category": "work",
+      "when": {
+        "weekday": true,
+        "hours": [
+          9,
+          17
+        ]
+      },
+      "weight": 4,
+      "cooldownHours": 48,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 120,
+          "text": "整理一小批待扫描照片"
+        },
+        {
+          "minutes": 120,
+          "text": "扫描与校对边角文字"
+        },
+        {
+          "minutes": 60,
+          "text": "收好工作材料"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "扫描",
+        "老照片"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "handwriting",
+      "name": "难辨认的旧字",
+      "category": "work",
+      "when": {
+        "weekday": true,
+        "hours": [
+          9,
+          17
+        ]
+      },
+      "weight": 2,
+      "cooldownHours": 96,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 90,
+          "text": "工作中遇到几个难辨认的字"
+        },
+        {
+          "minutes": 90,
+          "text": "慢慢核对字形后继续工作"
+        }
+      ],
+      "effect": "annoyed",
+      "aliases": [
+        "字迹",
+        "旧字"
+      ],
+      "moodHint": "只是表达倾向，不修改心情数值"
+    },
+    {
+      "id": "overtime",
+      "name": "临时加班",
+      "category": "work",
+      "when": {
+        "weekday": true,
+        "hours": [
+          15,
+          18
+        ]
+      },
+      "weight": 1,
+      "cooldownHours": 168,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 120,
+          "text": "今天有一小批工作要收尾"
+        },
+        {
+          "minutes": 90,
+          "text": "留下来整理完再回家"
+        }
+      ],
+      "effect": "fatigue",
+      "aliases": [
+        "加班"
+      ],
+      "moodHint": "疲惫倾向，不覆盖关心优先"
+    },
+    {
+      "id": "reading",
+      "name": "一本旧书",
+      "category": "hobby",
+      "when": {
+        "hours": [
+          19,
+          23
+        ]
+      },
+      "weight": 4,
+      "cooldownHours": 120,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 720,
+          "text": "开始翻一本旧书，没有记录具体书名"
+        },
+        {
+          "minutes": 1440,
+          "text": "读到一半，只能说读过的部分"
+        },
+        {
+          "minutes": 1440,
+          "text": "继续往后读"
+        },
+        {
+          "minutes": 240,
+          "text": "读到末尾；没记录内容，不评价结局"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "旧书",
+        "读到",
+        "看书"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "documentary",
+      "name": "看纪录片",
+      "category": "hobby",
+      "when": {
+        "hours": [
+          19,
+          23
+        ]
+      },
+      "weight": 3,
+      "cooldownHours": 72,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 70,
+          "text": "晚上打开一部纪录片，片名和内容尚无记录"
+        },
+        {
+          "minutes": 30,
+          "text": "看完后休息，不虚构影片内容"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "纪录片"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "bookstall",
+      "name": "逛旧书摊",
+      "category": "hobby",
+      "when": {
+        "days": [
+          "Sat"
+        ],
+        "hours": [
+          9,
+          12
+        ]
+      },
+      "weight": 3,
+      "cooldownHours": 144,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 60,
+          "text": "周六去旧书摊看看"
+        },
+        {
+          "minutes": 90,
+          "text": "翻了几本旧书，暂未记录买了什么"
+        },
+        {
+          "minutes": 60,
+          "text": "从书摊回家"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "书摊"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "tidy",
+      "name": "整理房间",
+      "category": "personal",
+      "when": {
+        "hours": [
+          10,
+          22
+        ]
+      },
+      "weight": 2,
+      "cooldownHours": 96,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 45,
+          "text": "整理桌面和旧纸"
+        },
+        {
+          "minutes": 30,
+          "text": "收拾完休息"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "整理",
+        "收拾"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "cold",
+      "name": "有点感冒",
+      "category": "personal",
+      "when": {
+        "hours": [
+          7,
+          23
+        ]
+      },
+      "weight": 0.4,
+      "cooldownHours": 720,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 1440,
+          "text": "有点鼻塞，先休息"
+        },
+        {
+          "minutes": 1440,
+          "text": "鼻塞比前一天轻了"
+        },
+        {
+          "minutes": 720,
+          "text": "感冒慢慢好了"
+        }
+      ],
+      "effect": "fatigue",
+      "aliases": [
+        "鼻塞",
+        "感冒"
+      ],
+      "moodHint": "疲惫倾向，不覆盖关心优先"
+    },
+    {
+      "id": "roadwork",
+      "name": "楼下修路",
+      "category": "personal",
+      "when": {
+        "weekday": true,
+        "hours": [
+          9,
+          17
+        ]
+      },
+      "weight": 0.6,
+      "cooldownHours": 720,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 480,
+          "text": "楼下小段道路施工，有些吵"
+        },
+        {
+          "minutes": 1440,
+          "text": "施工还在，白天比较吵"
+        },
+        {
+          "minutes": 480,
+          "text": "这段施工结束了"
+        }
+      ],
+      "effect": "annoyed",
+      "aliases": [
+        "修路",
+        "施工"
+      ],
+      "moodHint": "只是表达倾向，不修改心情数值"
+    },
+    {
+      "id": "familycall",
+      "name": "家里的电话",
+      "category": "periodic",
+      "when": {
+        "days": [
+          "Sun"
+        ],
+        "hours": [
+          19,
+          22
+        ]
+      },
+      "weight": 1,
+      "cooldownHours": 168,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 30,
+          "text": "周日晚上接了家里的电话，只记录发生，不编对话细节"
+        },
+        {
+          "minutes": 90,
+          "text": "挂电话后安静一会儿"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "家里",
+        "电话"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "rain",
+      "name": "下雨天",
+      "category": "periodic",
+      "when": {
+        "weather": "rain",
+        "hours": [
+          7,
+          23
+        ]
+      },
+      "weight": 2,
+      "cooldownHours": 72,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 120,
+          "text": "操作者确认当前下雨，待在室内听雨"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "下雨",
+        "雨声"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "humid",
+      "name": "回南天",
+      "category": "periodic",
+      "when": {
+        "weather": "humid",
+        "seasons": [
+          "春"
+        ],
+        "hours": [
+          7,
+          23
+        ]
+      },
+      "weight": 1,
+      "cooldownHours": 120,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 240,
+          "text": "已确认回南天，屋里潮，收拾衣物"
+        }
+      ],
+      "effect": "annoyed",
+      "aliases": [
+        "回南天",
+        "潮"
+      ],
+      "moodHint": "只是表达倾向，不修改心情数值"
+    },
+    {
+      "id": "summer",
+      "name": "夏日慢下来",
+      "category": "personal",
+      "when": {
+        "seasons": [
+          "夏"
+        ],
+        "hours": [
+          12,
+          19
+        ]
+      },
+      "weight": 1,
+      "cooldownHours": 96,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 120,
+          "text": "夏日下午在室内休息，懒得出门"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "夏天"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "winter",
+      "name": "冬日宅家",
+      "category": "personal",
+      "when": {
+        "seasons": [
+          "冬"
+        ],
+        "hours": [
+          18,
+          23
+        ]
+      },
+      "weight": 1,
+      "cooldownHours": 96,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 120,
+          "text": "冬日晚上在家，不大想出门"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "冬天"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "springhome",
+      "name": "春节回家",
+      "category": "periodic",
+      "when": {
+        "springFestival": true,
+        "hours": [
+          9,
+          22
+        ]
+      },
+      "weight": 1,
+      "cooldownHours": 8760,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 1440,
+          "text": "春节回老家"
+        },
+        {
+          "minutes": 1440,
+          "text": "在家待一天，不编催婚对话"
+        },
+        {
+          "minutes": 720,
+          "text": "准备返回住处"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "春节",
+        "老家"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "payday",
+      "name": "发工资日",
+      "category": "periodic",
+      "when": {
+        "payday": true,
+        "hours": [
+          17,
+          23
+        ]
+      },
+      "weight": 1,
+      "cooldownHours": 600,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 180,
+          "text": "配置的工资日到了，心情倾向轻松，不编金额或到账细节"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "工资"
+      ],
+      "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "trip",
+      "name": "准备与抵达",
+      "category": "travel",
+      "when": {
+        "travel": true,
+        "hours": [
+          9,
+          22
+        ]
+      },
+      "weight": 1,
+      "cooldownHours": 2880,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 1440,
+          "text": "准备一次出行，目的地尚未记录，未到达不汇报旅程"
+        },
+        {
+          "minutes": 720,
+          "text": "旅途中，尚未记录目的地名称"
+        },
+        {
+          "minutes": 1440,
+          "text": "抵达后安顿，只有记录的细节可以说"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "出门",
+        "旅途",
+        "出行"
+      ],
+      "moodHint": "不自动生成心情变化"
+    }
+  ]
+}

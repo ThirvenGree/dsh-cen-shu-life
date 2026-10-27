@@ -1,0 +1,41 @@
+{
+  "name": "dsh-cen-shu-life",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "岑舒日常生活、随机事件与只读心情行为联动",
+  "license": "MIT",
+  "main": "lib/host.js",
+  "exports": {
+    ".": "./lib/host.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "data",
+    "client.js",
+    "settings.html",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "scripts"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check lib/engine.js && node --check lib/host.js && node --check client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "slots"
+      ],
+      "external": [
+        "react"
+      ]
+    }
+  }
+}
