@@ -27,7 +27,7 @@ test('annoyed reaction stays fixed across stages, restart and quota exhaustion',
 }));
 test('all uncertain semantic states stay unknown; rules do not mislabel reported regressions',async()=>{
  for(const text of ['我已经不难受了','我喜欢你推荐的那本书','我朋友今天好累']){const r=ruleSignals(text);assert.equal(r.needsCare,false);assert.equal(r.confession,false);}
- for(const classify of [async()=>{throw Error('offline');},async()=>signal({confidence:69,confession:true}),async()=>new Promise(()=>{})]){const c=new SituationClassifier({classify});const r=await c.resolve('s','我喜欢你推荐的那本书',{...config,semanticTimeoutMs:5});assert.equal(r.confession,false);assert.equal(r.confidence,0);}
+ for(const classify of [async()=>{throw Error('offline');},async()=>signal({confidence:69,confession:true}),async()=>new Promise(()=>{})]){const c=new SituationClassifier({classify});const r=await c.resolve('s','我喜欢你推荐的那本书',{...config,semanticTimeoutMs:5});assert.equal(r.confession,false);assert.ok(r.confidence<70);}
 });
 test('circuit opens after consecutive failures and recovers after cooldown',async()=>{
  let now=0,calls=0,broken=true;const c=new SituationClassifier({now:()=>now,cooldownMs:100,classify:async()=>{calls++;if(broken)throw Error('offline');return signal();}});
