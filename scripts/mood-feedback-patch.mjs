@@ -7,6 +7,8 @@ export function patchMoodFeedback(source){
  return source.replace(importLine,"normalizeMoodContext, readLifeFeedback } from 'dsh-cen-shu-life/mood-link'").replace(anchor,anchor+"\n            lifeLink: readLifeFeedback(CFG_DIR, 这份, s),")+'\n// cen-shu-life feedback-ui v1\n';
 }
 export function installFeedbackViews(target){
+ const widget=path.join(target,'assets/widget.js');if(fs.existsSync(widget)){let text=fs.readFileSync(widget,'utf8');text=text.replace("(d.mood || '--') + '  ' + f.label","(d.mood == null ? '--' : Math.round(d.mood)) + '  ' + (d.moodLabel || f.label)");if(!text.includes("if(d.moodLabel==='烦')"))text=text.replace('var f = face(d.mood)',"var f = face(d.mood);if(d.moodLabel==='烦'){f.img=B+'/face-worry.png';f.label=d.moodLabel}");fs.writeFileSync(widget,text);}
+
  const patches=[['client.js',"        项.push(h('div', { key: 'preview', 'data-fm-sec': '' },",`        // cen-shu-life feedback-panel v2
         if(st && st.lifeLink) 项.push(h('div', { key: 'life-link', 'data-fm-sec': '' },
           h('div', { 'data-fm-h': '' }, '生活 ↔ 心情'),
