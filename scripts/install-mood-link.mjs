@@ -1,3 +1,4 @@
+import {patchMoodFeedback,installFeedbackViews} from './mood-feedback-patch.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -51,12 +52,14 @@ if(!source.includes('cen-shu-life adapter-protocol:3')){
   replaceOnce('if (delta.lifeAcceptedIds?.length || contextChanged)', 'if (delta.lifeProcessedIds?.length || contextChanged)');
   source=source.replaceAll('cen-shu-life adapter-protocol:2','cen-shu-life adapter-protocol:3').replace('cenShuLifeAdapterProtocol = 2','cenShuLifeAdapterProtocol = 3');
 }
+source=patchMoodFeedback(source);
 if(!verifyAdapterSource(source))throw Error('适配源码校验失败，未写入；请检查心情插件版本');
 if(!fs.existsSync(file+'.before-life-link.bak'))fs.copyFileSync(file,file+'.before-life-link.bak');
 const link=path.join(target,'node_modules/dsh-cen-shu-life');fs.mkdirSync(path.dirname(link),{recursive:true});
 if(!fs.existsSync(link))fs.symlinkSync(root,link,process.platform==='win32'?'junction':'dir');
 else if(fs.realpathSync(link)!==fs.realpathSync(root))throw Error('已有联动依赖指向其他位置，请先核对');
 const manifest=path.join(target,'package.json'),pkg=JSON.parse(fs.readFileSync(manifest,'utf8'));pkg.dependencies||={};pkg.dependencies['dsh-cen-shu-life']='file:'+path.relative(target,root).replaceAll('\\','/');
+installFeedbackViews(target);
 fs.writeFileSync(manifest,JSON.stringify(pkg,null,2));fs.writeFileSync(file,source);
 const home=process.env.DSH_HOME||path.join(os.homedir(),'.dsh');fs.mkdirSync(path.join(home,'cen-shu-life'),{recursive:true});fs.writeFileSync(path.join(home,'cen-shu-life/mood-link-install.json'),JSON.stringify({version:3,installed:true,moduleUrl:pathToFileURL(file).href,protocol:3,sourceSha256:sourceHash(source),pluginVersion:pkg.version,installedAt:Date.now()},null,2));
 console.log('已安装生活事件 → 原心情判断适配。重启 DSH 生效；原角色卡与原心情记录未改写。');
