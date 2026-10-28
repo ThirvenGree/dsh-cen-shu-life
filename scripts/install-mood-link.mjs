@@ -1,3 +1,5 @@
+import {execFileSync} from 'node:child_process';
+import {patchTimedMood} from './timed-mood-patch.mjs';
 import {patchMoodFeedback,installFeedbackViews} from './mood-feedback-patch.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -52,7 +54,8 @@ if(!source.includes('cen-shu-life adapter-protocol:3')){
   replaceOnce('if (delta.lifeAcceptedIds?.length || contextChanged)', 'if (delta.lifeProcessedIds?.length || contextChanged)');
   source=source.replaceAll('cen-shu-life adapter-protocol:2','cen-shu-life adapter-protocol:3').replace('cenShuLifeAdapterProtocol = 2','cenShuLifeAdapterProtocol = 3');
 }
-source=patchMoodFeedback(source);
+source=patchTimedMood(patchMoodFeedback(source));
+execFileSync(process.execPath,['--check','--input-type=module'],{input:source,stdio:['pipe','pipe','pipe'],env:{...process.env,ELECTRON_RUN_AS_NODE:'1'},windowsHide:true});
 if(!verifyAdapterSource(source))throw Error('适配源码校验失败，未写入；请检查心情插件版本');
 if(!fs.existsSync(file+'.before-life-link.bak'))fs.copyFileSync(file,file+'.before-life-link.bak');
 const link=path.join(target,'node_modules/dsh-cen-shu-life');fs.mkdirSync(path.dirname(link),{recursive:true});
