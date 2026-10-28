@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {LifeEngine} from '../lib/engine.js';
+import {EventSharing} from '../lib/event-sharing.js';
+const fixture=fn=>{const home=fs.mkdtempSync(path.join(os.tmpdir(),'life-sharing-'));try{fn(home);}finally{fs.rmSync(home,{recursive:true,force:true});}};
+test('one event tracks start, stage and end; model can defer or skip without changing mood',()=>fixture(home=>{
+ let now=Date.now();const e=new LifeEngine({home,now:()=>now});e.saveConfig({sessionIds:['target']});
+ e.history.events=[{id:'old',name:'旧事',status:'ended',startedAt:now-60000,endedAt:now}];
+ const sharing=new EventSharing(e);sharing.sync();assert.equal(sharing.view().eligible.length,0);
+ const event={id:'new',name:'一本旧书',status:'active',stage:0,stageText:'翻开了旧书',startedAt:now};e.state.active.push(event);sharing.sync();assert.equal(sharing.view().eligible.length,1);
+ const before=JSON.stringify(e.moodEvents);sharing.decide({eventId:'new',decision:'defer',reason:'想看完再说',delayMinutes:10});assert.equal(sharing.view().eligible.length,0);
+ event.stage=1;event.stageText='看到一张夹着的旧票';sharing.sync();assert.equal(sharing.view().items[0].status,'deferred');assert.equal(sharing.view().items[0].phases.length,2);
+ now+=11*60000;assert.equal(sharing.view().eligible.length,1);sharing.decide({eventId:'new',decision:'skip',reason:'这次留给自己'});
+ e.state.active=[];e.history.events.push({...event,status:'ended',endedAt:now});sharing.sync();assert.equal(sharing.view().items[0].status,'skipped');assert.equal(sharing.view().items[0].phases.length,3);
+ assert.equal(JSON.stringify(e.moodEvents),before);const restarted=new EventSharing(e);assert.equal(restarted.view().items[0].status,'skipped');
+}));
+test('verified receipt persists, suppresses later stages, and pure reads never write',()=>fixture(home=>{
+ let now=Date.now();const e=new LifeEngine({home,now:()=>now});e.saveConfig({sessionIds:['target']});const share=new EventSharing(e);
+ e.state.active=[{id:'weather',name:'今日多云',status:'active',stage:0,stageText:'大理天气预报多云',startedAt:now}];share.sync();
+ assert.throws(()=>share.receipt({eventIds:['missing'],tid:'t',at:now}));
+ share.receipt({eventIds:['weather'],tid:'verified-tid',url:'https://user.qzone.qq.com/',at:now});assert.equal(share.view().eligible.length,0);
+ e.state.active[0].stage=1;share.sync();assert.equal(share.view().items[0].publication.tid,'verified-tid');assert.equal(share.view().eligible.length,0);
+ assert.throws(()=>share.receipt({eventIds:['weather'],tid:'other',at:now}));
+ const file=path.join(e.dir,'event-sharing.json'),before=fs.readFileSync(file,'utf8'),stamp=fs.statSync(file).mtimeMs;
+ share.view();share.context();e.snapshot();assert.equal(fs.readFileSync(file,'utf8'),before);assert.equal(fs.statSync(file).mtimeMs,stamp);
+ assert.match(e.context('target'),/生活事件的可选空间后续/);
+ const restarted=new EventSharing(e);restarted.sync();assert.equal(restarted.view().eligible.length,0);
+}));
