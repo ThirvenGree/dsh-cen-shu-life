@@ -334,63 +334,6 @@
       "moodHint": "不自动生成心情变化"
     },
     {
-      "id": "rain",
-      "name": "下雨天",
-      "category": "periodic",
-      "when": {
-        "weather": "rain",
-        "hours": [
-          7,
-          23
-        ]
-      },
-      "weight": 2,
-      "cooldownHours": 72,
-      "repeatLimit": "same-template-cooldown-and-daily-cap",
-      "stages": [
-        {
-          "minutes": 120,
-          "text": "操作者确认当前下雨，待在室内听雨"
-        }
-      ],
-      "effect": "",
-      "aliases": [
-        "下雨",
-        "雨声"
-      ],
-      "moodHint": "不自动生成心情变化"
-    },
-    {
-      "id": "humid",
-      "name": "回南天",
-      "category": "periodic",
-      "when": {
-        "weather": "humid",
-        "seasons": [
-          "春"
-        ],
-        "hours": [
-          7,
-          23
-        ]
-      },
-      "weight": 1,
-      "cooldownHours": 120,
-      "repeatLimit": "same-template-cooldown-and-daily-cap",
-      "stages": [
-        {
-          "minutes": 240,
-          "text": "已确认回南天，屋里潮，收拾衣物"
-        }
-      ],
-      "effect": "annoyed",
-      "aliases": [
-        "回南天",
-        "潮"
-      ],
-      "moodHint": "只是表达倾向，不修改心情数值"
-    },
-    {
       "id": "summer",
       "name": "夏日慢下来",
       "category": "personal",
@@ -542,6 +485,27 @@
         "出行"
       ],
       "moodHint": "不自动生成心情变化"
+    },
+    {
+      "id": "weather-forecast",
+      "name": "大理当日天气预报",
+      "category": "periodic",
+      "when": {
+        "dailyForecast": true
+      },
+      "weight": 2,
+      "cooldownHours": 0,
+      "repeatLimit": "once-per-dali-date",
+      "stages": [
+        {
+          "minutes": 120,
+          "text": "有当天有效的联网天气预报后，根据预报动态生成天气事件。"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "天气预报"
+      ]
     }
   ]
 }
