@@ -2,7 +2,7 @@
   "name": "dsh-cen-shu-life",
   "version": "1.15.0",
   "type": "module",
-  "description": "岑舒日常生活、随机事件与只读心情行为联动",
+  "description": "岑舒日常生活、随机事件、心情双向联动与重要记忆写回",
   "license": "MIT",
   "main": "lib/host.js",
   "exports": {
@@ -11,7 +11,8 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./mood-link": "./lib/mood-link.js",
     "./weather-policy": "./lib/weather-policy.js",
-    "./mood-expression": "./lib/mood-expression.js"
+    "./mood-expression": "./lib/mood-expression.js",
+    "./calendar": "./lib/calendar.js"
   },
   "files": [
     "lib",
