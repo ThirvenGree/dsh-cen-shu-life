@@ -84,3 +84,22 @@ test('failed calls and ordinary event planning cannot bypass the shared model in
   await drawing.tick();const event=engine.add('drawing-inspiration');advance(16*60000);await drawing.tick();assert.equal(calls,1);
   await drawing.plan(event);assert.equal(calls,1);advance(45*60000);await drawing.tick();assert.equal(calls,2);
 }));
+
+test('three effective rejudgments close a deferred idea permanently across restart',()=>fixture(async({engine,advance})=>{
+  let calls=0;const generate=async()=>{calls++;return {...choice,decision:calls%2?'defer':'uncertain'};};
+  let drawing=makeDrawing(engine,{generate});await drawing.tick();const id=drawing.view().items[0].eventId;
+  for(let i=1;i<=3;i++){advance(61*60000);drawing=makeDrawing(engine,{generate});await drawing.tick();assert.equal(drawing.row(id).rejudgments,i);}
+  assert.equal(calls,4);assert.equal(drawing.row(id).status,'skip');assert.match(drawing.row(id).closureReason,/3次/);
+  advance(61*60000);drawing=makeDrawing(engine,{generate});await drawing.tick();await drawing.plan(engine.state.active[0]);assert.equal(calls,4);assert.equal(drawing.row(id).idea,choice.idea);
+}));
+test('the last allowed rejudgment can share, while network errors do not consume effective attempts',()=>fixture(async({engine,advance})=>{
+  let calls=0;const drawing=makeDrawing(engine,{generate:async()=>{calls++;if(calls===2)throw Error('network');return {...choice,decision:calls===5?'share':'defer'};}});
+  await drawing.tick();const id=drawing.view().items[0].eventId;
+  for(let i=0;i<4;i++){advance(61*60000);await drawing.tick();}
+  assert.equal(drawing.row(id).rejudgments,3);assert.equal(drawing.row(id).status,'ready');assert.equal(drawing.view().eligible.length,1);
+}));
+test('weight and seventy-two hour cooldown apply to both entries and upgrade existing deadlines',()=>fixture(async({engine})=>{
+  const template=engine.allTemplates().find(x=>x.id==='drawing-inspiration');assert.equal(template.weight,1);assert.equal(template.cooldownHours,72);
+  const event=engine.add(template.id);engine.state.cooldowns[template.id]=event.endsAt+24*3600000;
+  makeDrawing(engine);assert.equal(engine.state.cooldowns[template.id],event.endsAt+72*3600000);
+}));

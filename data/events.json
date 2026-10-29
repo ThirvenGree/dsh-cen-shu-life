@@ -517,8 +517,8 @@
           23
         ]
       },
-      "weight": 2,
-      "cooldownHours": 24,
+      "weight": 1,
+      "cooldownHours": 72,
       "repeatLimit": "same-template-cooldown-and-daily-cap",
       "stages": [
         {
