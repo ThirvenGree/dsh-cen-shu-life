@@ -24,7 +24,7 @@ test('initiative and generation claim once, verified send persists across restar
 }));
 test('Gemini may choose voice, uncertainty, postponement or no sharing; never forced to draw',()=>fixture(async({engine,advance})=>{
   engine.add('drawing-inspiration',{manual:true});let calls=0;const drawing=makeDrawing(engine,{generate:async()=>{calls++;return {...choice,decision:calls===1?'uncertain':'share',medium:'voice',prompt:''};}});
-  await drawing.tick();assert.equal(drawing.view().eligible.length,0);await drawing.tick();assert.equal(calls,1);advance(31*60000);await drawing.tick();assert.equal(drawing.view().eligible[0].medium,'voice');assert.throws(()=>drawing.begin(drawing.view().items[0].eventId));
+  await drawing.tick();assert.equal(drawing.view().eligible.length,0);await drawing.tick();assert.equal(calls,1);advance(61*60000);await drawing.tick();assert.equal(drawing.view().eligible[0].medium,'voice');assert.throws(()=>drawing.begin(drawing.view().items[0].eventId));
   const id=drawing.view().items[0].eventId;drawing.result({eventId:id,status:'shared',messageId:'sent-voice'});assert.equal(drawing.view().items[0].status,'sent');
 }));
 test('configuration errors pause; transient errors back off and reads do not write',()=>fixture(async({engine,advance})=>{
@@ -39,7 +39,7 @@ test('disable, expiry, malformed output and quiet time do not produce an opportu
 test('Gemini controls spontaneous occurrence independently of ordinary draws',()=>fixture(async({engine,advance})=>{
   let calls=0;const drawing=makeDrawing(engine,{generate:async()=>({...choice,inspiration:++calls===1?'absent':'present',decision:calls===1?'defer':'share',delayMinutes:40})});
   await drawing.tick();assert.equal(engine.state.active.length,0);assert.equal(calls,1);await drawing.tick();assert.equal(calls,1);
-  advance(41*60000);await drawing.tick();assert.equal(engine.state.active[0].templateId,'drawing-inspiration');assert.equal(drawing.view().eligible[0].idea,choice.idea);
+  advance(61*60000);await drawing.tick();assert.equal(engine.state.active[0].templateId,'drawing-inspiration');assert.equal(drawing.view().eligible[0].idea,choice.idea);
   const file=path.join(engine.dir,'drawing-inspiration.json'),before=fs.readFileSync(file,'utf8');drawing.view();assert.equal(fs.readFileSync(file,'utf8'),before);
 }));
 
@@ -51,7 +51,7 @@ test('private inspiration is a persisted life event without a proactive opportun
 test('deferred spontaneous inspiration can later share the same event',()=>fixture(async({engine,advance})=>{
   let calls=0;const drawing=makeDrawing(engine,{generate:async()=>({...choice,decision:++calls===1?'defer':'share'})});
   await drawing.tick();const id=engine.state.active[0].id;assert.equal(drawing.view().eligible.length,0);
-  advance(31*60000);await drawing.tick();assert.equal(drawing.view().eligible[0].eventId,id);assert.equal(engine.state.active.length,1);
+  advance(61*60000);await drawing.tick();assert.equal(drawing.view().eligible[0].eventId,id);assert.equal(engine.state.active.length,1);
 }));
 test('ordinary random pool includes drawing and models its private sharing choice',()=>fixture(async({engine})=>{
   const template=engine.allTemplates().find(x=>x.id==='drawing-inspiration');engine.allTemplates=()=>[template];
@@ -65,4 +65,22 @@ test('concurrent ordinary occurrence reuses the event and consumes the daily quo
   assert.equal(engine.state.active.length,1);assert.equal(drawing.view().items[0].eventId,event.id);
   assert.equal(Object.values(engine.state.daily).reduce((a,b)=>a+b,0),1);
   assert.equal(drawing.record.occasionFailures,0);
+}));
+
+test('drawing ordinary eligibility and model planning only run during waking hours',()=>fixture(async({engine,advance})=>{
+  const template=engine.allTemplates().find(x=>x.id==='drawing-inspiration');assert.deepEqual(template.when.hours,[6,23]);
+  let calls=0;const drawing=makeDrawing(engine,{generate:async()=>{calls++;return {...choice,inspiration:'absent',decision:'skip'};}});
+  advance(11*3600000);assert.equal(engine.eligible(template,engine.life(),engine.now()),false);await drawing.tick();assert.equal(calls,0);
+  advance(7*3600000);assert.equal(engine.eligible(template,engine.life(),engine.now()),true);await drawing.tick();assert.equal(calls,1);
+}));
+test('one minute model delays clamp to an hour and survive restart',()=>fixture(async({engine,advance,now})=>{
+  let calls=0;const generate=async()=>{calls++;return {...choice,inspiration:'absent',decision:'defer',delayMinutes:1};};
+  const drawing=makeDrawing(engine,{generate});await drawing.tick();assert.equal(drawing.view().nextJudgmentAt,now()+3600000);
+  advance(59*60000);await makeDrawing(engine,{generate}).tick();assert.equal(calls,1);
+  advance(60000);await makeDrawing(engine,{generate}).tick();assert.equal(calls,2);
+}));
+test('failed calls and ordinary event planning cannot bypass the shared model interval',()=>fixture(async({engine,advance})=>{
+  let calls=0;const drawing=makeDrawing(engine,{generate:async()=>{calls++;throw Error('network');}});
+  await drawing.tick();const event=engine.add('drawing-inspiration');advance(16*60000);await drawing.tick();assert.equal(calls,1);
+  await drawing.plan(event);assert.equal(calls,1);advance(45*60000);await drawing.tick();assert.equal(calls,2);
 }));

@@ -513,8 +513,8 @@
       "category": "hobby",
       "when": {
         "hours": [
-          0,
-          24
+          6,
+          23
         ]
       },
       "weight": 2,
