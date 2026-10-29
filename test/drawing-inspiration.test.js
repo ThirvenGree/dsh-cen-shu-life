@@ -4,7 +4,7 @@ import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {LifeEngine} from '../lib/engine.js';
 import {DrawingInspiration,validateDrawingChoice,drawingOpportunity} from '../lib/drawing-inspiration.js';
 const makeDrawing=(engine,options={})=>new DrawingInspiration(engine,{review:async(_s,_schema,input)=>input.candidate,...options});
-const choice={decision:'share',medium:'generated_image',idea:'旧窗上的一片光',prompt:'以插画表现旧木窗和落在窗边的一片暖光，不是实拍',reason:'有值得画下来的画面',validMinutes:90,delayMinutes:30};
+const choice={inspiration:'present',decision:'share',medium:'generated_image',idea:'旧窗上的一片光',prompt:'以插画表现旧木窗和落在窗边的一片暖光，不是实拍',reason:'有值得画下来的画面',validMinutes:90,delayMinutes:30};
 async function fixture(fn){const home=fs.mkdtempSync(path.join(os.tmpdir(),'life-drawing-'));let now=new Date('2026-10-29T12:00:00+08:00').getTime();const engine=new LifeEngine({home,now:()=>now,random:()=>.5});engine.saveConfig({sessionIds:['target'],probability:0});try{await fn({home,engine,now:()=>now,advance:ms=>now+=ms});}finally{fs.rmSync(home,{recursive:true,force:true});}}
 test('drawing is a real bounded event; Gemini determines idea and medium once per event',()=>fixture(async({engine})=>{
   assert.ok(engine.allTemplates().some(t=>t.id==='drawing-inspiration'&&t.name==='画画灵感'));
@@ -36,9 +36,33 @@ test('disable, expiry, malformed output and quiet time do not produce an opportu
   engine.add('drawing-inspiration',{manual:true});const drawing=makeDrawing(engine,{generate:async()=>choice});await drawing.tick();advance(91*60000);assert.equal(drawing.view().eligible.length,0);
   engine.saveConfig({semanticEnabled:false});assert.equal(drawing.context(),'');assert.throws(()=>drawing.begin(drawing.view().items[0].eventId));
 }));
-test('Gemini controls whether and when inspiration happens, not a random template draw',()=>fixture(async({engine,advance})=>{
-  let calls=0;const drawing=makeDrawing(engine,{generate:async()=>({...choice,decision:++calls===1?'defer':'share',delayMinutes:40})});
+test('Gemini controls spontaneous occurrence independently of ordinary draws',()=>fixture(async({engine,advance})=>{
+  let calls=0;const drawing=makeDrawing(engine,{generate:async()=>({...choice,inspiration:++calls===1?'absent':'present',decision:calls===1?'defer':'share',delayMinutes:40})});
   await drawing.tick();assert.equal(engine.state.active.length,0);assert.equal(calls,1);await drawing.tick();assert.equal(calls,1);
   advance(41*60000);await drawing.tick();assert.equal(engine.state.active[0].templateId,'drawing-inspiration');assert.equal(drawing.view().eligible[0].idea,choice.idea);
   const file=path.join(engine.dir,'drawing-inspiration.json'),before=fs.readFileSync(file,'utf8');drawing.view();assert.equal(fs.readFileSync(file,'utf8'),before);
+}));
+
+test('private inspiration is a persisted life event without a proactive opportunity',()=>fixture(async({engine})=>{
+  const drawing=makeDrawing(engine,{generate:async()=>({...choice,decision:'skip'})});
+  await drawing.tick();assert.equal(engine.state.active.length,1);assert.equal(engine.state.active[0].stageText,choice.idea);
+  assert.equal(drawing.view().eligible.length,0);assert.equal(makeDrawing(engine).view().items[0].status,'skip');
+}));
+test('deferred spontaneous inspiration can later share the same event',()=>fixture(async({engine,advance})=>{
+  let calls=0;const drawing=makeDrawing(engine,{generate:async()=>({...choice,decision:++calls===1?'defer':'share'})});
+  await drawing.tick();const id=engine.state.active[0].id;assert.equal(drawing.view().eligible.length,0);
+  advance(31*60000);await drawing.tick();assert.equal(drawing.view().eligible[0].eventId,id);assert.equal(engine.state.active.length,1);
+}));
+test('ordinary random pool includes drawing and models its private sharing choice',()=>fixture(async({engine})=>{
+  const template=engine.allTemplates().find(x=>x.id==='drawing-inspiration');engine.allTemplates=()=>[template];
+  engine.saveConfig({probability:1});engine.tick();assert.equal(engine.state.active[0]?.templateId,'drawing-inspiration');
+  const drawing=makeDrawing(engine,{generate:async()=>({...choice,decision:'skip'})});await drawing.tick();
+  assert.equal(drawing.view().eligible.length,0);assert.equal(engine.state.active[0].stageText,choice.idea);
+}));
+test('concurrent ordinary occurrence reuses the event and consumes the daily quota once',()=>fixture(async({engine})=>{
+  let resolve;const pending=new Promise(r=>resolve=r);const drawing=makeDrawing(engine,{generate:()=>pending});
+  const run=drawing.tick();const event=engine.add('drawing-inspiration');resolve(choice);await run;
+  assert.equal(engine.state.active.length,1);assert.equal(drawing.view().items[0].eventId,event.id);
+  assert.equal(Object.values(engine.state.daily).reduce((a,b)=>a+b,0),1);
+  assert.equal(drawing.record.occasionFailures,0);
 }));
