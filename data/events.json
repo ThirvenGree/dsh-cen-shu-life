@@ -506,6 +506,38 @@
       "aliases": [
         "天气预报"
       ]
+    },
+    {
+      "id": "drawing-inspiration",
+      "name": "画画灵感",
+      "category": "hobby",
+      "when": {
+        "hours": [
+          0,
+          24
+        ]
+      },
+      "weight": 2,
+      "cooldownHours": 24,
+      "repeatLimit": "same-template-cooldown-and-daily-cap",
+      "stages": [
+        {
+          "minutes": 30,
+          "text": "一个画面浮上心头，生出把它画下来的兴致"
+        },
+        {
+          "minutes": 30,
+          "text": "慢慢理清画面，斟酌要不要画出来、分享给青枔看看"
+        }
+      ],
+      "effect": "",
+      "aliases": [
+        "画画",
+        "灵感",
+        "画面"
+      ],
+      "moodHint": "灵感带来的感受由现有心情插件判断，不因生成或发送图片重复加分",
+      "modelOccasion": true
     }
   ]
 }
