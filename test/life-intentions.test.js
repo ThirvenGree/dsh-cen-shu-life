@@ -1,3 +1,5 @@
+import {PersonaLearning} from '../lib/persona-learning.js';
+const approve=async(_p,_s,input)=>({checks:input.candidates.map(x=>({id:x.id,decision:'supported',confidence:95,reason:'原文支持',quotes:x.citedEvidence.map(e=>({evidenceId:e.id,text:e.text}))}))});
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {revokeDeletedMemory} from '../lib/persona-evolution.js';
 import {sharedLifeContext} from '../lib/shared-context.js';
@@ -36,13 +38,12 @@ test('changed semantic settings discard an old draft; retry uses the new model o
 test('expired generated drafts are replaced rather than revived',()=>fixture(async({e,home,advance,now})=>{
  let calls=0;const generate=async()=>{calls++;return raw;};e.activateBehaviorNotes=()=>{throw Error('apply failure');};await new ContentEvolution(e,{generate}).refresh(true);advance(25*3600000);const restarted=new LifeEngine({home,now});await new ContentEvolution(restarted,{generate}).refresh(true);assert.equal(calls,2);assert.equal(restarted.content.generatedAt,now());
 }));
-test('partial persona application is idempotent when a generated draft resumes',()=>fixture(async({e,home,advance,now})=>{
- e.saveConfig({personaEvolutionEnabled:true});const evidence=[{id:'fact-a',source:'memory',text:'青枔说喜欢看旧照片'}],data={...raw,personaFacts:[{kind:'preference',text:'记得青枔喜欢旧照片',evidenceIds:['fact-a'],confidence:95,validDays:2}]};let calls=0;const generate=async()=>{calls++;return data;},save=e.saveProfile.bind(e);e.saveProfile=patch=>{save(patch);throw Error('stopped after persona save');};const pending=await new ContentEvolution(e,{generate,selectMemory:async()=>evidence}).refresh(true);assert.equal(pending.checkpoint.phase,'generated');const expires=e.profile.evolvingFacts[0].expiresAt;advance(10*60000);const restarted=new LifeEngine({home,now});await new ContentEvolution(restarted,{generate,selectMemory:async()=>{throw Error('must reuse draft evidence');}}).refresh(true);assert.equal(calls,1);assert.equal(restarted.profile.evolvingFacts[0].expiresAt,expires);assert.equal(restarted.evolutionStatus.status,'ready');
+test('partial persona application is idempotent when review resumes',()=>fixture(async({e,home,advance,now})=>{
+ e.saveConfig({personaEvolutionEnabled:true});const evidence=[{id:'fact-a',source:'memory',text:'青枔说喜欢看旧照片'}],fact={kind:'preference',text:'记得青枔喜欢旧照片',evidenceIds:['fact-a'],confidence:95,validDays:2};let calls=0;const generate=async()=>{calls++;return {facts:[fact]};},save=e.saveProfile.bind(e);e.saveProfile=patch=>{save(patch);throw Error('stopped after persona save');};const pending=await new PersonaLearning(e,{generate,review:approve,selectMemory:async()=>evidence}).refresh(true);assert.equal(pending.phase,'apply');const expires=e.profile.evolvingFacts[0].expiresAt;advance(10*60000);const restarted=new LifeEngine({home,now});await new PersonaLearning(restarted,{generate,review:async()=>{throw Error('must reuse checks');},selectMemory:async()=>{throw Error('must reuse evidence');}}).refresh(true);assert.equal(calls,1);assert.equal(restarted.profile.evolvingFacts[0].expiresAt,expires);assert.equal(restarted.personaLearningStatus.status,'ready');
 }));
-
-test('explicitly deleted draft evidence cannot recreate a persona fact after recovery',()=>fixture(async({e,home,now})=>{
- e.saveConfig({personaEvolutionEnabled:true});const evidence=[{id:'draft-fact',source:'memory',text:'青枔说喜欢看旧照片'}],data={...raw,personaFacts:[{kind:'preference',text:'记得青枔喜欢旧照片',evidenceIds:['draft-fact'],confidence:95,validDays:2}]};const original=e.write.bind(e);e.write=(file,value)=>{original(file,value);if(file==='model-content.json'&&value.status==='applying')throw Error('after draft save');};await new ContentEvolution(e,{generate:async()=>data,selectMemory:async()=>evidence}).refresh(true);assert.equal(e.profile.evolvingFacts,undefined);assert.equal(revokeDeletedMemory(e,evidence[0].text),true);e.write=original;
- const restarted=new LifeEngine({home,now});await new ContentEvolution(restarted,{generate:async()=>{throw Error('must reuse existing draft');}}).refresh(true);assert.equal((restarted.profile.evolvingFacts||[]).length,0);assert.equal(restarted.evolutionStatus.status,'ready');
+test('explicitly deleted evidence cannot recreate a persona fact after review recovery',()=>fixture(async({e,home,now})=>{
+ e.saveConfig({personaEvolutionEnabled:true});const evidence=[{id:'draft-fact',source:'memory',text:'青枔说喜欢看旧照片'}],fact={kind:'preference',text:'记得青枔喜欢旧照片',evidenceIds:['draft-fact'],confidence:95,validDays:2};await new PersonaLearning(e,{generate:async()=>({facts:[fact]}),review:async()=>{throw Error('network');},selectMemory:async()=>evidence}).refresh(true);assert.equal(e.profile.evolvingFacts,undefined);assert.equal(revokeDeletedMemory(e,evidence[0].text),true);
+ const restarted=new LifeEngine({home,now});await new PersonaLearning(restarted,{generate:async()=>{throw Error('must reuse candidates');},review:approve}).refresh(true);assert.equal((restarted.profile.evolvingFacts||[]).length,0);assert.equal(restarted.personaLearningStatus.status,'ready');
 }));
 
 test('audited cancel edits the existing intention and changes actual lottery without ending real events',()=>fixture(async({e})=>{
@@ -80,3 +81,13 @@ test('a cancellation made while a daily request is running survives its stale re
 test('legacy wishes with no template binding still retain explicit cancellation across refresh',()=>{
  const old={id:'intention:legacy',adjustedAt:1,validFrom:1,expiresAt:100,templateIds:[],priority:0},fresh={id:'intention:new',mentionKey:'intention:legacy',validFrom:2,expiresAt:99,templateIds:[],priority:1};assert.deepEqual(preserveAdjustedIntentions([old],[fresh],10),[old]);
 });
+
+test('raising an overlapping positive wish changes the actual lottery multiplier',()=>fixture(async({e})=>{
+ await new ContentEvolution(e,{generate:async()=>({...raw,intentions:[{...raw.intentions[0],priority:1},{...raw.intentions[0],text:'也想翻翻书边的纸条',priority:1}]})}).refresh(true);
+ const item=e.content.intentions[0];assert.equal(intentionChoice(e,'books').priority,1);const result=sharedLifeContext(e,{}).submitInnerResult({sessionId:'main',id:'inner:mean',intentionChanges:[{id:item.id,generatedAt:item.generatedAt,expectedRevision:0,action:'raise',priority:2,reason:'更想整理了'}]});assert.equal(intentionChoice(e,'books').priority,1.5);assert.equal(result.intentions.accepted[0].effectiveWeights[0].after,1.5);assert.equal(result.intentions.accepted[0].effectStatus,'effective');
+ e.tick();assert.equal(e.state.lastSelection.candidates.find(x=>x.id==='books').weight,1.5);
+}));
+test('a separate deferred wish vetoes a raise and receipt reports the unchanged weight',()=>fixture(async({e})=>{
+ await new ContentEvolution(e,{generate:async()=>({...raw,intentions:[{...raw.intentions[0],priority:1},{...raw.intentions[0],text:'今天先不要整理',priority:0}]})}).refresh(true);
+ const item=e.content.intentions[0],result=sharedLifeContext(e,{}).submitInnerResult({sessionId:'main',id:'inner:veto',intentionChanges:[{id:item.id,generatedAt:item.generatedAt,expectedRevision:0,action:'raise',priority:2,reason:'还是有一点兴趣'}]});const receipt=result.intentions.accepted[0];assert.equal(intentionChoice(e,'books').priority,0);assert.equal(receipt.effectStatus,'blocked');assert.equal(receipt.effectiveWeights[0].before,0);assert.equal(receipt.effectiveWeights[0].after,0);assert.equal(receipt.effectiveWeights[0].blockedBy.length,1);
+}));
