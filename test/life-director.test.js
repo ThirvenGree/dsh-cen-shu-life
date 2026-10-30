@@ -1,0 +1,23 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
+import {LifeEngine} from '../lib/engine.js';import {LifeDirector} from '../lib/life-director.js';
+async function fixture(fn){const home=fs.mkdtempSync(path.join(os.tmpdir(),'director-'));let now=Date.parse('2026-10-30T18:00:00+08:00');try{const e=new LifeEngine({home,now:()=>now});e.saveConfig({sessionIds:['main'],probability:0});e.templates.events=[{id:'book',name:'旧书',category:'personal',when:{},weight:1,cooldownHours:0,stages:[{minutes:1,text:'整理旧书'},{minutes:1,text:'夹回票根'}]}];await fn(e,ms=>now+=ms);}finally{fs.rmSync(home,{recursive:true,force:true});}}
+const value=()=>({decision:'act',reason:'今晚有兴致',nextMinutes:5,startTemplateId:'book',reaction:{label:'平静',text:'整理时平静下来',moodDelta:1,happy:0,calm:1,sad:0},progress:[],behavior:{mode:'normal',label:'有点疲惫但愿意说话',understanding:'累与想聊天可以并存',speech:'自然简短',action:'先整理一点',validMinutes:30},intentionChanges:[]});
+test('model starts an eligible event despite legacy probability zero, persists mode and does not auto-end by clock',()=>fixture(async(e,advance)=>{
+ const d=new LifeDirector(e,{generate:async()=>value()});await d.refresh();assert.equal(e.state.active.length,1);assert.equal(e.state.active[0].reaction.id,'model');assert.match(e.context('main'),/有点疲惫但愿意说话/);advance(3*60000);e.tick();assert.equal(e.state.active.length,1);assert.equal(e.state.active[0].stage,0);assert.equal(new LifeDirector(e,{generate:()=>{throw Error('not due');}}).mode('main').model,true);
+}));
+test('model uncertainty does not mutate facts, failures never fall back to weighted drawing',()=>fixture(async(e)=>{
+ const d=new LifeDirector(e,{generate:async()=>({...value(),decision:'uncertain'})});await d.refresh();assert.equal(e.state.active.length,0);d.record.nextAt=0;d.generate=async()=>{throw Error('offline');};await d.refresh();e.tick();assert.equal(e.state.active.length,0);assert.equal(d.view().status,'waiting');assert.match(d.view().error,/offline/);
+}));
+test('selected event must remain eligible after model returns; unrelated context reads do not call model',()=>fixture(async(e)=>{
+ let calls=0;const d=new LifeDirector(e,{generate:async()=>{calls++;e.state.cooldowns.book=e.now()+600000;return value();}});await d.refresh();assert.equal(e.state.active.length,0);assert.match(d.record.lastResult.startRejected,/条件/);e.context('main');e.snapshot();assert.equal(calls,2);
+}));
+test('model can progress and end an event while rejected unknown IDs keep state unchanged',()=>fixture(async(e,advance)=>{
+ const d=new LifeDirector(e,{generate:async()=>value()});await d.refresh();const id=e.state.active[0].id;advance(6*60000);d.generate=async()=>({...value(),startTemplateId:'',progress:[{id,action:'advance',text:'把找到的票根夹回书里',minutes:10,reason:'整理告一段落'}]});await d.refresh();assert.equal(e.state.active[0].stage,1);assert.equal(e.state.active[0].stageText,'把找到的票根夹回书里');advance(6*60000);d.generate=async()=>({...value(),startTemplateId:'',progress:[{id,action:'end',text:'',minutes:1,reason:'已经收拾完'}]});await d.refresh();assert.equal(e.state.active.length,0);assert.equal(e.history.events[0].id,id);
+}));
+test('saved generated draft resumes after failure without a second model call',()=>fixture(async(e)=>{
+ let calls=0;const d=new LifeDirector(e,{generate:async()=>{calls++;return value();}}),write=e.write.bind(e);let failed=false;e.write=(file,obj)=>{if(file==='mood-events.json'&&!failed){failed=true;throw Error('disk');}return write(file,obj);};await d.refresh();assert.ok(d.record.draft);const restarted=new LifeEngine({home:e.home,now:e.now});restarted.templates=e.templates;const resumed=new LifeDirector(restarted,{generate:async()=>{calls++;return value();}});resumed.record.retryAt=0;await resumed.refresh();assert.equal(calls,2);assert.equal(restarted.state.active.length,1);
+}));
+
+test('review retry reuses proposal and does not regenerate the same life decision',()=>fixture(async(e,advance)=>{
+ let generated=0,reviewed=0;const d=new LifeDirector(e,{generate:async()=>{generated++;return value();},review:async()=>{reviewed++;if(reviewed===1)throw Error('review offline');return value();}});await d.refresh();assert.ok(d.record.proposal);assert.equal(e.state.active.length,0);advance(3*60000);await d.refresh();assert.equal(generated,1);assert.equal(reviewed,2);assert.equal(e.state.active.length,1);
+}));
