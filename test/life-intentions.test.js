@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {revokeDeletedMemory} from '../lib/persona-evolution.js';
 import {sharedLifeContext} from '../lib/shared-context.js';
-import {LifeEngine} from '../lib/engine.js';import {ContentEvolution} from '../lib/content-evolution.js';import {filterIntentions,intentionChoice,intentionView} from '../lib/life-intentions.js';
+import {LifeEngine} from '../lib/engine.js';import {ContentEvolution} from '../lib/content-evolution.js';import {filterIntentions,intentionChoice,intentionView,preserveAdjustedIntentions} from '../lib/life-intentions.js';
 const raw={version:1,templates:[],scheduleNotes:[],behaviorNotes:[],intentions:[{text:'晚点想把旧书理一理',startHour:18,endHour:21,validMinutes:120,templateNames:['整理旧书'],priority:2}],personaFacts:[]};
 const template=(id,name)=>({id,name,category:'personal',when:{hours:[7,23]},weight:1,cooldownHours:0,stages:[{minutes:20,text:'整理桌边的小东西'}]});
 async function fixture(fn){const home=fs.mkdtempSync(path.join(os.tmpdir(),'life-intentions-'));let now=Date.parse('2026-10-30T18:00:00+08:00');try{const e=new LifeEngine({home,now:()=>now,random:()=>0});e.saveConfig({sessionIds:['main'],personaEvolutionEnabled:false,probability:1,maxDaily:4,maxActive:2});e.templates.events=[template('books','整理旧书'),template('desk','整理桌面')];await fn({e,home,now:()=>now,advance:ms=>now+=ms});}finally{fs.rmSync(home,{recursive:true,force:true});}}
@@ -76,3 +76,7 @@ test('an unexpired wish becomes mentionable again after the configured three-hou
 test('a cancellation made while a daily request is running survives its stale result',()=>fixture(async({e})=>{
  const manager=new ContentEvolution(e,{generate:async()=>raw});await manager.refresh(true);let finish;manager.generate=()=>new Promise(resolve=>finish=resolve);const pending=manager.refresh(true);await Promise.resolve();const item=e.content.intentions[0];sharedLifeContext(e,{}).submitInnerResult({sessionId:'main',id:'inner:in-flight',intentionChanges:[{id:item.id,generatedAt:item.generatedAt,expectedRevision:0,action:'cancel',priority:0,reason:'生成期间改为早休息'}]});finish(raw);await pending;assert.equal(e.content.intentions.length,1);assert.equal(e.content.intentions[0].id,item.id);assert.equal(intentionView(e)[0].status,'cancelled');assert.equal(intentionChoice(e,'books').priority,0);
 }));
+
+test('legacy wishes with no template binding still retain explicit cancellation across refresh',()=>{
+ const old={id:'intention:legacy',adjustedAt:1,validFrom:1,expiresAt:100,templateIds:[],priority:0},fresh={id:'intention:new',mentionKey:'intention:legacy',validFrom:2,expiresAt:99,templateIds:[],priority:1};assert.deepEqual(preserveAdjustedIntentions([old],[fresh],10),[old]);
+});
