@@ -1,6 +1,6 @@
 {
   "name": "dsh-cen-shu-life",
-  "version": "1.27.0",
+  "version": "1.28.0",
   "type": "module",
   "description": "岑舒日常生活、随机事件、心情双向联动与重要记忆写回",
   "license": "MIT",
@@ -28,7 +28,7 @@
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check lib/event-sharing.js && node --check lib/engine.js && node --check lib/host.js && node --check client.js && node --check lib/mood-link.js && node --check scripts/install-mood-link.mjs && node --check lib/situation.js && node --check lib/content-evolution.js && node --check lib/defaults-store.js && node --check lib/adapter-health.js && node --check lib/request-guard.js && node --check lib/weather.js && node --check lib/weather-policy.js && node --check scripts/install-weather-policy.mjs && node --check lib/weather-policy-health.js && node --check lib/persona-evolution.js && node --check lib/memory-review.js && node --check scripts/mood-feedback-patch.mjs && node --check lib/timed-events.js && node --check lib/timed-input.js && node --check scripts/timed-mood-patch.mjs && node --check lib/memory-selection.js && node --check lib/memory-writeback.js && node --check lib/mood-expression.js && node --check scripts/expression-patch.mjs && node --check lib/drawing-inspiration.js && node --check lib/drawing-schedule.js && node --check lib/shared-context.js && node --check lib/change-feed.js && node --check lib/adapter-coordination.js && node --check lib/life-intentions.js && node --check lib/persona-learning.js && node --check lib/inner-effects.js && node --check lib/life-director.js && node --check lib/personal-settings.js && node --check lib/semantic-mentions.js && node --check lib/project-evidence.js"
+    "check": "node --check lib/event-sharing.js && node --check lib/engine.js && node --check lib/host.js && node --check client.js && node --check lib/mood-link.js && node --check scripts/install-mood-link.mjs && node --check lib/situation.js && node --check lib/content-evolution.js && node --check lib/defaults-store.js && node --check lib/adapter-health.js && node --check lib/request-guard.js && node --check lib/weather.js && node --check lib/weather-policy.js && node --check scripts/install-weather-policy.mjs && node --check lib/weather-policy-health.js && node --check lib/persona-evolution.js && node --check lib/memory-review.js && node --check scripts/mood-feedback-patch.mjs && node --check lib/timed-events.js && node --check lib/timed-input.js && node --check scripts/timed-mood-patch.mjs && node --check lib/memory-selection.js && node --check lib/memory-writeback.js && node --check lib/mood-expression.js && node --check scripts/expression-patch.mjs && node --check lib/drawing-inspiration.js && node --check lib/drawing-schedule.js && node --check lib/shared-context.js && node --check lib/change-feed.js && node --check lib/adapter-coordination.js && node --check lib/life-intentions.js && node --check lib/persona-learning.js && node --check lib/inner-effects.js && node --check lib/life-director.js && node --check lib/personal-settings.js && node --check lib/semantic-mentions.js && node --check lib/project-evidence.js && node --check lib/personality-sources.js && node --check lib/personality-sync.js"
   },
   "dsh": {
     "bundle": {
