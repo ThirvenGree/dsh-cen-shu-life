@@ -1,6 +1,6 @@
 {
   "name": "dsh-cen-shu-life",
-  "version": "1.16.6",
+  "version": "1.16.7",
   "type": "module",
   "description": "岑舒日常生活、随机事件、心情双向联动与重要记忆写回",
   "license": "MIT",
