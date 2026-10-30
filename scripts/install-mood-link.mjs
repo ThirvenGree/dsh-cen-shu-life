@@ -1,3 +1,4 @@
+import {synchronizeMoodAdapters} from '../lib/adapter-coordination.js';
 import {patchExpressions,installExpressions} from './expression-patch.mjs';
 import {execFileSync} from 'node:child_process';
 import {patchTimedMood} from './timed-mood-patch.mjs';
@@ -55,10 +56,13 @@ if(!source.includes('cen-shu-life adapter-protocol:3')){
   replaceOnce('if (delta.lifeAcceptedIds?.length || contextChanged)', 'if (delta.lifeProcessedIds?.length || contextChanged)');
   source=source.replaceAll('cen-shu-life adapter-protocol:2','cen-shu-life adapter-protocol:3').replace('cenShuLifeAdapterProtocol = 2','cenShuLifeAdapterProtocol = 3');
 }
+if(!source.includes('d.lifeContributionReceipts ='))replaceOnce('    d.lifeEventReceipts =', '    d.lifeContributionReceipts = Array.isArray(raw.lifeContributionReceipts) ? raw.lifeContributionReceipts.slice(-300) : []\n    d.lifeEventReceipts =');
 source=patchExpressions(patchTimedMood(patchMoodFeedback(source)));
 source=source.replace("const 自主搭话 = new Set(['speak-up'])","const 自主搭话 = new Set(['speak-up', 'censhu-inner-life-notice'])");
 
 execFileSync(process.execPath,['--check','--input-type=module'],{input:source,stdio:['pipe','pipe','pipe'],env:{...process.env,ELECTRON_RUN_AS_NODE:'1'},windowsHide:true});
+const home=process.env.DSH_HOME||path.join(os.homedir(),'.dsh');
+synchronizeMoodAdapters(home,file,source,{validateOnly:true});
 if(!verifyAdapterSource(source))throw Error('适配源码校验失败，未写入；请检查心情插件版本');
 if(!fs.existsSync(file+'.before-life-link.bak'))fs.copyFileSync(file,file+'.before-life-link.bak');
 const link=path.join(target,'node_modules/dsh-cen-shu-life');fs.mkdirSync(path.dirname(link),{recursive:true});
@@ -67,5 +71,6 @@ else if(fs.realpathSync(link)!==fs.realpathSync(root))throw Error('已有联动�
 const manifest=path.join(target,'package.json'),pkg=JSON.parse(fs.readFileSync(manifest,'utf8'));pkg.dependencies||={};pkg.dependencies['dsh-cen-shu-life']='file:'+path.relative(target,root).replaceAll('\\','/');
 installFeedbackViews(target);installExpressions(target);
 fs.writeFileSync(manifest,JSON.stringify(pkg,null,2));fs.writeFileSync(file,source);
-const home=process.env.DSH_HOME||path.join(os.homedir(),'.dsh');fs.mkdirSync(path.join(home,'cen-shu-life'),{recursive:true});fs.writeFileSync(path.join(home,'cen-shu-life/mood-link-install.json'),JSON.stringify({version:3,installed:true,moduleUrl:pathToFileURL(file).href,protocol:3,sourceSha256:sourceHash(source),pluginVersion:pkg.version,installedAt:Date.now()},null,2));
+fs.mkdirSync(path.join(home,'cen-shu-life'),{recursive:true});fs.writeFileSync(path.join(home,'cen-shu-life/mood-link-install.json'),JSON.stringify({version:3,installed:true,moduleUrl:pathToFileURL(file).href,protocol:3,sourceSha256:sourceHash(source),pluginVersion:pkg.version,installedAt:Date.now()},null,2));
+synchronizeMoodAdapters(home,file,source);
 console.log('已安装生活事件 → 原心情判断适配。重启 DSH 生效；原角色卡与原心情记录未改写。');
