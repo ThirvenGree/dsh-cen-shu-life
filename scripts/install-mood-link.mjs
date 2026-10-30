@@ -72,5 +72,6 @@ const manifest=path.join(target,'package.json'),pkg=JSON.parse(fs.readFileSync(m
 installFeedbackViews(target);installExpressions(target);
 fs.writeFileSync(manifest,JSON.stringify(pkg,null,2));fs.writeFileSync(file,source);
 fs.mkdirSync(path.join(home,'cen-shu-life'),{recursive:true});fs.writeFileSync(path.join(home,'cen-shu-life/mood-link-install.json'),JSON.stringify({version:3,installed:true,moduleUrl:pathToFileURL(file).href,protocol:3,sourceSha256:sourceHash(source),pluginVersion:pkg.version,installedAt:Date.now()},null,2));
-synchronizeMoodAdapters(home,file,source);
+const coordinated=synchronizeMoodAdapters(home,file,source);
+for(const item of coordinated.skipped)console.warn('未更新对方登记：'+item.reason+'；本次心情联动安装继续完成');
 console.log('已安装生活事件 → 原心情判断适配。重启 DSH 生效；原角色卡与原心情记录未改写。');
