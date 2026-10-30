@@ -56,6 +56,8 @@ if(!source.includes('cen-shu-life adapter-protocol:3')){
   source=source.replaceAll('cen-shu-life adapter-protocol:2','cen-shu-life adapter-protocol:3').replace('cenShuLifeAdapterProtocol = 2','cenShuLifeAdapterProtocol = 3');
 }
 source=patchExpressions(patchTimedMood(patchMoodFeedback(source)));
+source=source.replace("const 自主搭话 = new Set(['speak-up'])","const 自主搭话 = new Set(['speak-up', 'censhu-inner-life-notice'])");
+
 execFileSync(process.execPath,['--check','--input-type=module'],{input:source,stdio:['pipe','pipe','pipe'],env:{...process.env,ELECTRON_RUN_AS_NODE:'1'},windowsHide:true});
 if(!verifyAdapterSource(source))throw Error('适配源码校验失败，未写入；请检查心情插件版本');
 if(!fs.existsSync(file+'.before-life-link.bak'))fs.copyFileSync(file,file+'.before-life-link.bak');
