@@ -37,3 +37,16 @@ test('real pet input goes through the existing bound memory queue and respects d
   assert.equal(calls.length,1);
  }finally{fs.rmSync(home,{recursive:true,force:true});}
 });
+
+test('attention context exposes current event lifecycle and original timeline without side effects',()=>{
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'life-attention-'));
+ try{
+  const e=new LifeEngine({home});e.saveConfig({sessionIds:['main']});const service=sharedLifeContext(e,{});
+  e.state.active.push({id:'book',name:'整理旧书',stage:1,stageText:'夹回票根',moodAdmission:'admitted'});
+  e.changes.append('event-start',{eventId:'book',name:'整理旧书',stage:0,stageText:'发现票根'});
+  const before=fs.readFileSync(path.join(e.dir,'state.json'),'utf8');let value=service.attentionContext({sessionId:'main',eventIds:['book','unknown']});
+  assert.equal(value.events[0].status,'active');assert.equal(value.events[0].stageText,'夹回票根');assert.equal(value.events[0].timeline[0].text,'发现票根');assert.equal(value.events[1].status,'unknown');
+  e.history.events.push({...e.state.active.pop(),endedAt:e.now()});value=service.attentionContext({sessionId:'main',eventIds:['book']});assert.equal(value.events[0].status,'ended');
+  assert.equal(fs.readFileSync(path.join(e.dir,'state.json'),'utf8'),before);assert.throws(()=>service.attentionContext({sessionId:'foreign',eventIds:['book']}),/未绑定/);
+ }finally{fs.rmSync(home,{recursive:true,force:true});}
+});
