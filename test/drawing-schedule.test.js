@@ -50,7 +50,7 @@ test('activity protocol explicitly handles seconds, milliseconds, unknown versio
  write('cen-shu-life/qq-activity-v1.json',source);let rows=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(rows[0].at,now()-2000);assert.equal(rows.health.ready,true);
  write('cen-shu-life/qq-activity-v1.json',{...source,version:2});assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'incompatible');
  write('cen-shu-life/qq-activity-v1.json',{...source,updatedAt:(now()-181000)/1000});assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'stale');
- write('cen-shu-life/qq-activity-v1.json',{...source,timeUnit:'ms',updatedAt:now()});assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'invalid-time');
+ write('cen-shu-life/qq-activity-v1.json',{...source,timeUnit:'ms',updatedAt:now()});const invalid=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(invalid.health.ready,true);assert.equal(invalid.health.skippedRows,1);assert.equal(invalid.length,0);
 }));
 test('healthy empty feed differs from missing feed and retained anchors survive an empty recent buffer',()=>fixture(async({home,write,now})=>{
  assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'unavailable');
@@ -62,4 +62,13 @@ test('healthy empty feed differs from missing feed and retained anchors survive 
 test('source failure remains visible even after daily anchor exists and pauses spontaneous requests',()=>fixture(async({engine,now,advance})=>{
  let ready=true,calls=0;const d=new DrawingInspiration(engine,{activity:()=>{const rows=ready?[{at:now(),messageId:'1',direction:'received'}]:[];rows.health={ready,code:ready?'ready':'incompatible',message:'test'};return rows;},generate:async()=>{calls++;return window;}});
  await d.tick();assert.equal(calls,1);const next=d.day().nextAt;ready=false;advance(next-now()+1);await d.tick();assert.equal(calls,1);assert.equal(d.view().activityHealth.code,'incompatible');assert.ok(d.day());
+}));
+
+
+test('malformed retained anchors and individual messages are skipped without losing genuine activity or planning',()=>fixture(async({home,engine,write,now})=>{
+ const source={contract:'qq-bridge/life-activity',version:1,timeUnit:'ms',updatedAt:now(),bindings:[null,{sessionId:'target'}],firstByDay:{old:{at:now()-86400000,sessionId:'target',direction:'received'}},messages:[null,{at:now()-3000,sessionId:'target',direction:'received'},{at:'bad',sessionId:'target',direction:'received',messageId:'bad-time'},{at:now()-1000,sessionId:'target',direction:'received',messageId:'good'}]};
+ write('cen-shu-life/qq-activity-v1.json',source);
+ const rows=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(rows.length,1);assert.equal(rows[0].messageId,'good');assert.equal(rows.health.ready,true);assert.equal(rows.health.skippedRows,4);
+ let calls=0;const d=new DrawingInspiration(engine,{generate:async()=>{calls++;return window;}});await d.tick();assert.equal(calls,1);assert.equal(d.view().activityHealth.skippedRows,4);assert.equal(d.day().firstMessageAt,now()-1000);
+ write('cen-shu-life/qq-activity-v1.json',{...source,timeUnit:'unknown'});assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.ready,false);
 }));
