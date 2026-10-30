@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
 import {LifeEngine} from '../lib/engine.js';
 import {DrawingInspiration,validateDrawingChoice,drawingOpportunity} from '../lib/drawing-inspiration.js';
-const makeDrawing=(engine,options={})=>{const d=new DrawingInspiration(engine,{review:async(_s,_schema,input)=>input.candidate,...options});if(!d.day()){const date=engine.life().date;d.record.days||={};d.record.days[date]={date,firstMessageAt:engine.now()-60000,status:'scheduled',nextAt:engine.now()};d.save();}return d;};
+const makeDrawing=(engine,options={})=>{const d=new DrawingInspiration(engine,{activity:()=>[],review:async(_s,_schema,input)=>input.candidate,...options});if(!d.day()){const date=engine.life().date;d.record.days||={};d.record.days[date]={date,firstMessageAt:engine.now()-60000,status:'scheduled',nextAt:engine.now()};d.save();}return d;};
 const choice={inspiration:'present',decision:'share',medium:'generated_image',idea:'旧窗上的一片光',prompt:'以插画表现旧木窗和落在窗边的一片暖光，不是实拍',reason:'有值得画下来的画面',validMinutes:90,delayMinutes:30};
 async function fixture(fn){const home=fs.mkdtempSync(path.join(os.tmpdir(),'life-drawing-'));let now=new Date('2026-10-29T12:00:00+08:00').getTime();const engine=new LifeEngine({home,now:()=>now,random:()=>.5});engine.saveConfig({sessionIds:['target'],probability:0});try{await fn({home,engine,now:()=>now,advance:ms=>now+=ms});}finally{fs.rmSync(home,{recursive:true,force:true});}}
 test('drawing is a real bounded event; Gemini determines idea and medium once per event',()=>fixture(async({engine})=>{

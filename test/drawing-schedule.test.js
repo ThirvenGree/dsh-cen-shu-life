@@ -28,10 +28,9 @@ test('timestamps vary within a window and night-only windows move into randomize
  const night=Date.parse('2026-10-30T22:00:00+08:00'),a=pickDrawingTime(night,120,180,()=>.1),b=pickDrawingTime(night,120,180,()=>.9);
  assert.notEqual(a,b);assert.equal(clock(a).date,'2026-10-31');assert.ok(Number(clock(a).hour)>=6&&Number(clock(a).hour)<23);assert.throws(()=>pickDrawingTime(now,30,90));
 });
-test('only actual acknowledged send or received records count, with earliest timestamp and correct binding',()=>fixture(async({home,write,now})=>{
- write('storages/session_projcache/sessions/session-target.json',{record:{identity:{cwd:home}}});write('state/sessions.json',{sessions:{'private:3230659580':'session-target'}});
- write('state/social-v2.json',{conversations:{'private:3230659580':{recentMessages:[{time:now()-1000,isSelf:true,text:'发送失败'},{time:now()-2000,isSelf:false,messageId:'received'},{time:now()-500,isSelf:true,messageId:'sent'},{time:now()+60000,isSelf:false,messageId:'future'}]}}});
- const rows=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(rows.length,2);assert.equal(rows[0].messageId,'received');assert.equal(qqDayActivity(home,['other'],now(),'Asia/Shanghai').length,0);
+test('versioned activity interface supplies bound records without any DSH cache or bridge state access',()=>fixture(async({home,write,now})=>{
+ write('cen-shu-life/qq-activity-v1.json',{contract:'qq-bridge/life-activity',version:1,timeUnit:'ms',updatedAt:now(),bindings:[{sessionId:'session-target'}],firstByDay:{},messages:[{at:now()-2000,sessionId:'target',direction:'received',messageId:'received'},{at:now()-500,sessionId:'target',direction:'sent',messageId:'sent'}]});
+ const rows=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(rows.length,2);assert.equal(rows[0].messageId,'received');assert.equal(rows.health.ready,true);assert.equal(qqDayActivity(home,['other'],now(),'Asia/Shanghai').health.code,'unbound');
 }));
 test('failed day scheduling is persisted and does not retry every background poll',()=>fixture(async({engine,now,advance})=>{
  let calls=0;const options={activity:()=>[{at:now(),messageId:'1',direction:'sent'}],generate:async()=>{calls++;throw Error('network');}};
@@ -44,4 +43,23 @@ test('night carryover preserves the chosen time but waits for next-day real inte
   let d=new DrawingInspiration(engine,options);await d.tick();const chosen=d.day().nextAt;assert.equal(clock(chosen).date,'2026-10-31');
   hasMessage=false;advance(8*3600000+10*60000);await d.tick();assert.equal(d.day(),null);assert.equal(calls,1);
   hasMessage=true;advance(31000);d=new DrawingInspiration(engine,options);await d.tick();assert.equal(d.day().nextAt,chosen);assert.equal(d.day().carriedFrom,'2026-10-30');assert.equal(calls,1);
+}));
+
+test('activity protocol explicitly handles seconds, milliseconds, unknown versions and stale heartbeat',()=>fixture(async({home,write,now})=>{
+ const source={contract:'qq-bridge/life-activity',version:1,timeUnit:'s',updatedAt:now()/1000,bindings:[{sessionId:'target'}],firstByDay:{},messages:[{at:(now()-2000)/1000,sessionId:'target',direction:'received',messageId:'one'}]};
+ write('cen-shu-life/qq-activity-v1.json',source);let rows=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(rows[0].at,now()-2000);assert.equal(rows.health.ready,true);
+ write('cen-shu-life/qq-activity-v1.json',{...source,version:2});assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'incompatible');
+ write('cen-shu-life/qq-activity-v1.json',{...source,updatedAt:(now()-181000)/1000});assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'stale');
+ write('cen-shu-life/qq-activity-v1.json',{...source,timeUnit:'ms',updatedAt:now()});assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'invalid-time');
+}));
+test('healthy empty feed differs from missing feed and retained anchors survive an empty recent buffer',()=>fixture(async({home,write,now})=>{
+ assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'unavailable');
+ const base={contract:'qq-bridge/life-activity',version:1,timeUnit:'ms',updatedAt:now(),bindings:[{sessionId:'target'}],firstByDay:{},messages:[]};write('cen-shu-life/qq-activity-v1.json',base);
+ assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.ready,true);
+ write('cen-shu-life/qq-activity-v1.json',{...base,firstByDay:{today:{at:now()-1000,sessionId:'target',direction:'sent',messageId:null,receiptId:'upload-confirmed'}}});
+ assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai')[0].receiptId,'upload-confirmed');
+}));
+test('source failure remains visible even after daily anchor exists and pauses spontaneous requests',()=>fixture(async({engine,now,advance})=>{
+ let ready=true,calls=0;const d=new DrawingInspiration(engine,{activity:()=>{const rows=ready?[{at:now(),messageId:'1',direction:'received'}]:[];rows.health={ready,code:ready?'ready':'incompatible',message:'test'};return rows;},generate:async()=>{calls++;return window;}});
+ await d.tick();assert.equal(calls,1);const next=d.day().nextAt;ready=false;advance(next-now()+1);await d.tick();assert.equal(calls,1);assert.equal(d.view().activityHealth.code,'incompatible');assert.ok(d.day());
 }));
