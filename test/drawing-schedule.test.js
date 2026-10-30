@@ -50,7 +50,8 @@ test('activity protocol explicitly handles seconds, milliseconds, unknown versio
  write('cen-shu-life/qq-activity-v1.json',source);let rows=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(rows[0].at,now()-2000);assert.equal(rows.health.ready,true);
  write('cen-shu-life/qq-activity-v1.json',{...source,version:2});assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'incompatible');
  write('cen-shu-life/qq-activity-v1.json',{...source,updatedAt:(now()-181000)/1000});assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'stale');
- write('cen-shu-life/qq-activity-v1.json',{...source,timeUnit:'ms',updatedAt:now()});const invalid=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(invalid.health.ready,true);assert.equal(invalid.health.skippedRows,1);assert.equal(invalid.length,0);
+ write('cen-shu-life/qq-activity-v1.json',{...source,timeUnit:'ms',updatedAt:now()});const invalid=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(invalid.health.ready,true);assert.equal(invalid.health.skippedRows,1);assert.equal(invalid.length,0);assert.equal(invalid.health.code,'all-invalid');assert.equal(invalid.health.warning,true);assert.match(invalid.health.message,/全部 1 条记录无效/);
+ write('cen-shu-life/qq-activity-v1.json',{...source,timeUnit:'ms',updatedAt:now(),messages:[...source.messages,{at:now()-1000,sessionId:'target',direction:'received',messageId:'ok'}]});const partial=qqDayActivity(home,['target'],now(),'Asia/Shanghai');assert.equal(partial.health.code,'partial');assert.equal(partial.health.warning,undefined);assert.equal(partial.length,1);
 }));
 test('healthy empty feed differs from missing feed and retained anchors survive an empty recent buffer',()=>fixture(async({home,write,now})=>{
  assert.equal(qqDayActivity(home,['target'],now(),'Asia/Shanghai').health.code,'unavailable');

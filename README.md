@@ -331,3 +331,5 @@ QQ Agent 通过 `qq_life_inspiration` 查看或跳过灵感；生图时向 `qq_g
 1.16.5：QQ 活动数据改为 bridge 主动发布的 ~/.dsh/cen-shu-life/qq-activity-v1.json，不再读取 DSH 内部 session_projcache 或 bridge 私有 social-v2.json。接口包含 contract=qq-bridge/life-activity、version=1、timeUnit、updatedAt、bindings、firstByDay 和 messages；timeUnit 明确声明所有时间戳单位（当前 bridge 发布 ms，读取器也可按显式 s 转换）。bridge 每60秒刷新心跳，并将每天首条真实收发回执独立保留14天，最近消息被截断不丢起点。普通文本回执保留真实消息ID；私聊文件上传成功可用独立 receiptId。源缺失、协议/单位/结构变化、绑定不符和超过3分钟无心跳均在画画设置卡显示，并暂停新的自发判断，区别于“今天没有消息”。需要更新后的本机 QQ bridge；不回退内部缓存猜测数据。OneBot 原始 time 为秒，bridge 的 time/at 为 Date.now() 毫秒，含义是桥接观察或实际发送确认时间。
 
 1.16.6：活动接口中的单条坏消息或每天首条坏记录只跳过该项，不再阻断其他消息和自发判断；设置页显示本次读取跳过的记录数（含首条记录）。单条时间戳异常同样跳过。协议、顶层结构、单位、心跳和会话绑定仍校验，无法可靠读取的数据源会提示并暂停。即使所有记录无效，也只等待后续有效互动，不调用模型。
+
+1.16.7：读取成功但所有记录都无效时（例如 bridge 把秒级时间戳声明为 ms），数据源状态标记为 `all-invalid` 并在设置页显示 ⚠ 与原因，不再显示为“正常”，以免被误认为当天没有聊天。行为不变：仍不调用模型，等待后续有效互动；部分记录无效时仍为 `partial` 并显示跳过数。
