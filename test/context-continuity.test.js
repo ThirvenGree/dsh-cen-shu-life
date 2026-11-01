@@ -92,8 +92,16 @@ test('assembly preserves downstream results, continues when disabled, and propag
  try{
  const result=await h.assemble(async()=>{calls++;await Promise.resolve();return downstream;});
  assert.equal(calls,1);assert.equal(result.sections,downstream.sections);assert.equal(result.tools,downstream.tools);assert.equal(result.variables,downstream.variables);
- assert.equal(result.contexts.find(x=>x.name==='other').text,'keep');assert.equal(result.contexts.find(x=>x.name==='memory:test').text,'青枔说喜欢茶');assert.equal(downstream.contexts[0].text,'青椒说喜欢茶');assert.equal(result.contexts.filter(x=>x.name==='cen-shu-life').length,1);assert.notEqual(result.contexts.find(x=>x.name==='cen-shu-life').text,'stale');
+ assert.equal(result.contexts.find(x=>x.name==='other').text,'keep');assert.equal(result.contexts.find(x=>x.name==='memory:test').text,'青椒说喜欢茶');assert.equal(downstream.contexts[0].text,'青椒说喜欢茶');assert.equal(result.contexts.filter(x=>x.name==='cen-shu-life').length,1);assert.notEqual(result.contexts.find(x=>x.name==='cen-shu-life').text,'stale');
  e.config.context=false;assert.equal(await h.assemble(async()=>{calls++;return downstream;}),downstream);assert.equal(calls,2);
  const failure=new Error('downstream failed');await assert.rejects(h.assemble(async()=>{throw failure;}),e=>e===failure);
  }finally{h.dispose();}
+}));
+
+test('memory evidence write failures cannot abort assembly or mutate recalled food text',()=>fixture(async home=>{
+ const e=new LifeEngine({home});e.saveConfig({sessionIds:['target'],probability:0,contentEvolutionEnabled:false,weatherAutoEnabled:false,personaEvolutionEnabled:true});
+ const h=harness(e,new SituationClassifier());const write=e.write.bind(e),before=e.runtimeMemoryEvidence;
+ e.write=(name,...args)=>{if(name==='memory-evidence.json')throw Error('disk full');return write(name,...args);};
+ const memory={name:'memory:test',text:'青枔喜欢青椒。青椒的味道很好。青椒在桌上，和番茄一起。'};
+ try{const result=await h.assemble(async()=>({contexts:[memory]}));assert.equal(result.contexts[0],memory);assert.ok(result.contexts.some(x=>x.name==='cen-shu-life'));assert.equal(e.runtimeMemoryEvidence,before);}finally{h.dispose();}
 }));
