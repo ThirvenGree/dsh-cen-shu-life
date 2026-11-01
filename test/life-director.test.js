@@ -22,3 +22,15 @@ test('review retry reuses proposal and does not regenerate the same life decisio
  let generated=0,reviewed=0;const d=new LifeDirector(e,{generate:async()=>{generated++;return value();},review:async()=>{reviewed++;if(reviewed===1)throw Error('review offline');return value();}});await d.refresh();assert.ok(d.record.proposal);assert.equal(e.state.active.length,0);advance(3*60000);await d.refresh();assert.equal(generated,1);assert.equal(reviewed,2);assert.equal(e.state.active.length,1);
 }));
 test('director gets full private planning catalog independently of chat selection',()=>fixture(async(e)=>{const privateRecord={id:'private',intention:'今晚不看纪录片，早点休息',shareState:'private'};e.innerLifeProvider=()=>({records:[]});e.innerLifePlanning=()=>({records:[privateRecord],items:[]});let input;new LifeDirector(e,{generate:async(_p,_s,i)=>{input=i.input||i;return {...value(),decision:'wait',startTemplateId:''};}});await e.director.refresh();assert.deepEqual(input.inner.records,[privateRecord]);}));
+
+
+test('new real activity during generation discards stale decision before review, then retries fresh',()=>fixture(async(e,advance)=>{
+ let generated=0,reviewed=0;const d=new LifeDirector(e,{generate:async()=>{generated++;if(generated===1)e.write('recent-activity.json',{at:e.now(),recent:[{text:'新来信'}]});return value();},review:async()=>{reviewed++;return value();}});
+ await d.refresh();assert.equal(e.state.active.length,0);assert.equal(reviewed,0);assert.equal(d.record.proposal,undefined);assert.match(d.record.reason,/来源已变化/);assert.equal(d.record.error,'');
+ advance(61000);await d.refresh();assert.equal(e.state.active.length,1);assert.equal(generated,2);assert.equal(reviewed,1);
+}));
+
+test('event changed during review cannot be overwritten by the old behavior or plan',()=>fixture(async(e)=>{
+ const d=new LifeDirector(e,{generate:async()=>value(),review:async()=>{e.add('book');return value();}});
+ await d.refresh();assert.equal(e.state.active.length,1);assert.equal(d.record.proposal,undefined);assert.equal(d.record.draft,undefined);assert.equal(d.view().behavior,null);assert.match(d.record.reason,/复核期间/);
+}));

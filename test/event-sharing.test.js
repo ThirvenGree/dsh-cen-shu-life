@@ -29,3 +29,5 @@ test('verified receipt persists, suppresses later stages, and pure reads never w
  assert.match(e.context('target'),/生活事件的可选空间后续/);
  const restarted=new EventSharing(e);restarted.sync();assert.equal(restarted.view().eligible.length,0);
 }));
+
+test('qzone uncertainty remains visible and only reopens consideration after its delay',()=>fixture(home=>{let now=Date.now();const e=new LifeEngine({home,now:()=>now});e.saveConfig({sessionIds:['target']});const sharing=new EventSharing(e);e.state.active=[{id:'uncertain-event',name:'旧画',status:'active',stage:0,stageText:'翻到旧画',startedAt:now}];sharing.sync();sharing.decide({eventId:'uncertain-event',decision:'uncertain',reason:'还没决定是否分享',delayMinutes:60});assert.equal(sharing.view().items[0].status,'uncertain');assert.equal(sharing.view().eligible.length,0);now+=61*60000;assert.equal(sharing.view().eligible.length,1);assert.equal(sharing.view().items[0].status,'uncertain');assert.equal(sharing.view().items[0].publication,undefined);}));

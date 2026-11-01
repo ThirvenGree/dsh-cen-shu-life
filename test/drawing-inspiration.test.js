@@ -89,7 +89,7 @@ test('three effective rejudgments close a deferred idea permanently across resta
   let calls=0;const generate=async()=>{calls++;return {...choice,decision:calls%2?'defer':'uncertain'};};
   let drawing=makeDrawing(engine,{generate});await drawing.tick();const id=drawing.view().items[0].eventId;
   for(let i=1;i<=3;i++){advance(91*60000);drawing=makeDrawing(engine,{generate});await drawing.tick();assert.equal(drawing.row(id).rejudgments,i);}
-  assert.equal(calls,4);assert.equal(drawing.row(id).status,'skip');assert.match(drawing.row(id).closureReason,/3次/);
+  assert.equal(calls,4);assert.equal(drawing.row(id).status,'closed');assert.equal(drawing.row(id).decision,'uncertain');assert.match(drawing.row(id).closureReason,/3次/);
   advance(91*60000);drawing=makeDrawing(engine,{generate});await drawing.tick();await drawing.plan(engine.state.active[0]);assert.equal(calls,4);assert.equal(drawing.row(id).idea,choice.idea);
 }));
 test('the last allowed rejudgment can share, while network errors do not consume effective attempts',()=>fixture(async({engine,advance})=>{

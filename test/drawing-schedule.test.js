@@ -26,7 +26,7 @@ test('spontaneous judgment may schedule another window or stop for today indepen
 test('timestamps vary within a window and night-only windows move into randomized waking time',()=>{
  const now=Date.parse('2026-10-30T09:00:00+08:00');assert.notEqual(pickDrawingTime(now,60,180,()=>.1),pickDrawingTime(now,60,180,()=>.9));
  const night=Date.parse('2026-10-30T22:00:00+08:00'),a=pickDrawingTime(night,120,180,()=>.1),b=pickDrawingTime(night,120,180,()=>.9);
- assert.notEqual(a,b);assert.equal(clock(a).date,'2026-10-31');assert.ok(Number(clock(a).hour)>=6&&Number(clock(a).hour)<23);assert.throws(()=>pickDrawingTime(now,30,90));
+ assert.notEqual(a,b);assert.equal(clock(a).date,'2026-10-31');assert.ok(Number(clock(a).hour)>=6&&Number(clock(a).hour)<23);assert.ok(pickDrawingTime(now,30,90)>=now+30*60000);assert.throws(()=>pickDrawingTime(now,0,90));
 });
 test('versioned activity interface supplies bound records without any DSH cache or bridge state access',()=>fixture(async({home,write,now})=>{
  write('cen-shu-life/qq-activity-v1.json',{contract:'qq-bridge/life-activity',version:1,timeUnit:'ms',updatedAt:now(),bindings:[{sessionId:'session-target'}],firstByDay:{},messages:[{at:now()-2000,sessionId:'target',direction:'received',messageId:'received'},{at:now()-500,sessionId:'target',direction:'sent',messageId:'sent'}]});

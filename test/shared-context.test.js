@@ -23,18 +23,20 @@ test('pet snapshots reuse current memory without writing state or mixing other s
   assert.throws(()=>service.snapshot({sessionId:'session-a'}),/未启用/);
  }finally{fs.rmSync(home,{recursive:true,force:true});}
 });
-test('real pet input goes through the existing bound memory queue and respects disable',()=>{
+test('pet input never changes shared activity or the memory queue, including old clients',()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'life-pet-observe-'));
  try{
   const engine=new LifeEngine({home}),calls=[];
   engine.saveConfig({sessionIds:['session-a']});
   const service=sharedLifeContext(engine,{observe:(...args)=>calls.push(args)});
-  service.observe({sessionId:'session-a',text:'青枔喜欢热茶',reply:'助手的猜测'});
-  assert.deepEqual(calls,[['session-a','青枔喜欢热茶']]);
+  const activityBefore=engine.read('recent-activity.json',{});
+  assert.deepEqual(service.observe({sessionId:'session-a',text:'青枔喜欢热茶',reply:'助手的猜测'}),{accepted:false,reason:'pet-read-only'});
+  assert.deepEqual(calls,[]);
+  assert.deepEqual(engine.read('recent-activity.json',{}),activityBefore);
   assert.throws(()=>service.observe({sessionId:'session-foreign',text:'其他来信'}),/未绑定/);
   engine.saveConfig({memoryWritebackEnabled:false});
-  assert.deepEqual(service.observe({sessionId:'session-a',text:'不应写回'}),{accepted:false});
-  assert.equal(calls.length,1);
+  assert.deepEqual(service.observe({sessionId:'session-a',text:'不应写回'}),{accepted:false,reason:'pet-read-only'});
+  assert.equal(calls.length,0);
  }finally{fs.rmSync(home,{recursive:true,force:true});}
 });
 
