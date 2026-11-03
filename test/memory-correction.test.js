@@ -24,3 +24,13 @@ test('forget verifies absence and reconciles lost receipt without repeating dele
  const f=fixture({loseReply:true});f.messages[0].text='忘掉说喜欢这本书的那条记忆';const args={action:'remove',replacement:undefined};
  await assert.rejects(f.run(args),/receipt lost/);assert.deepEqual(f.revoked,[]);assert.equal(JSON.parse(await f.run(args)).status,'verified');assert.equal(f.writes,1);assert.deepEqual(f.rows,[f.food]);assert.deepEqual(f.revoked,[f.old]);
 });
+
+test('Engram replacement follows the backend successor ID before revoking the old evidence',async()=>{
+ const records=new Map([['old',{id:'old',status:'active',content:'A'}]]),db={},revoked=[];
+ const engine={config:{enabled:true},bound:id=>id==='qq',now:()=>1,read:(k,d)=>k.includes('integration')?{sessionId:'qq',qqPrivateId:'peer'}:structuredClone(db[k]||d),write:(k,v)=>{db[k]=structuredClone(v);}};
+ const tools={execute:async exec=>{const a=exec.arguments;if(exec.name==='censhu_engram_record'){const r=records.get(a.id);return {value:r?{found:true,...r}:{found:false}};}
+ assert.equal(exec.name,'engram_update');assert.ok(isAuditedWrite(exec));records.get(a.id).status='superseded';records.set('new',{id:'new',status:'active',content:a.content});return {value:{id:'new',superseded:a.id}};}};
+ const t=correctionTool(engine,tools,{facts:()=>({key:'private:peer',messages:[{id:'1',role:'user',text:'把 A 改为 B'}]}),review:async()=>({allow:true,reason:'明确更正'}),revoke:(_,v)=>revoked.push(v)});
+ const result=JSON.parse(await t.execute({backend:'engram',id:'old',target:'user',original:'A',replacement:'B',action:'replace'},{agent:{id:'qq'}}));
+ assert.equal(result.status,'verified');assert.deepEqual(revoked,['A']);
+});
