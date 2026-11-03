@@ -1,0 +1,22 @@
+{
+  "storage/content_write.py": {
+    "original": "753165edf6e67dfbed045ffbff66a0bbcbfbde8d6c1ae549162aa30510f93a75",
+    "patched": "dfdd99f9a59a8d8abf66b89fe8d0017f4c2eb5485c50fb7221aefc15a028205d"
+  },
+  "service/fs_service.py": {
+    "original": "e90b0a62912fecb74d24622843f26416bd08a1f69fe2c2f9e4fbb1917cb85d3b",
+    "patched": "111f9d2deaa057ce32097002fdd3daadf768e1f93294332c3b5d987b2086a8b3"
+  },
+  "storage/viking_fs/_ops.py": {
+    "original": "e9112c89c836ccd234c9560d805050efeb428ae30523f0d8cbf23a85c4d1e0cd",
+    "patched": "4f1c3038ff4543e0b62720444c260b2bdc158a14613dda21d6e89d4542a46417"
+  },
+  "server/routers/filesystem.py": {
+    "original": "7d18e21cc86ea7f6979bc3088d8c4bd105d82ed507bb9c58cfa6fed391c086c9",
+    "patched": "469f055917a4c0d9a3f367250ecfddaca15deef853857b76e7cc0a77dc1fc185"
+  },
+  "server/routers/content.py": {
+    "original": "135f3646418330266089714a663eb114fa2d9a60544471d0b10718a7d3ddd7d1",
+    "patched": "afe5d6212cd5a1bfb97b5ee01273600dd8954d62e804b5ea71aee4ce72d87dda"
+  }
+}
