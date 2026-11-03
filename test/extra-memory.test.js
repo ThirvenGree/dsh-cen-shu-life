@@ -73,3 +73,13 @@ test('Pet generic correction leaves the source intact until preview, user confir
  const first=await confirm();await assert.rejects(pet('main','/确认记忆 FFFFFFFFFX'));assert.match(await pet('main',first),/未执行/);assert.equal(text,'original');
  allow=true;const second=await confirm();assert.match(await pet('main',second),/已更正/);assert.equal(text,'changed');assert.equal(count,1);await assert.rejects(pet('main',second),/失效/);
 });
+test('old approved versions cannot replace a root file or delete a concurrent update',{skip:!process.env.CENSHU_OV_FIXTURE},async()=>{
+ const base=process.env.CENSHU_OV_FIXTURE;assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/);assert.notEqual(new URL(base).port,'1933');
+ const call=async(path,init={})=>{const r=await fetch(base+path,{...init,headers:{'content-type':'application/json','X-API-Key':process.env.CENSHU_OV_FIXTURE_KEY}});const v=await r.json();return {ok:r.ok,status:r.status,result:v.result,error:v.error}};
+ const user=(await call('/api/v1/system/status')).result.user;assert.equal(user,'fixture');
+ const id='viking://user/fixture/memories/cas-'+Date.now()+'.md',a={backend:'openviking',target:'user',id,action:'replace',original:'a',replacement:'b'};
+ const x=extraMemory({},()=>({client:{fetchJSON:call}}));assert.ok((await call('/api/v1/content/write',{method:'POST',body:JSON.stringify({uri:id,mode:'create',content:'a',wait:false})})).ok);
+ const {revision}=await x.inspect(a,'fixture','a');await x.apply(a,'fixture',()=>{},revision);
+ for(const action of ['replace','remove']){await assert.rejects(x.apply({...a,action},'fixture',()=>{},revision),e=>e.notApplied===true);assert.ok((await x.inspect(a,'fixture','b')).exact);}
+ await x.apply({...a,action:'remove',original:'b'},'fixture');assert.ok((await x.inspect(a,'fixture','b')).absent);
+});

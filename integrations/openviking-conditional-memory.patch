@@ -1,0 +1,182 @@
+--- a/storage/content_write.py
++++ b/storage/content_write.py
+@@ -688,7 +688,14 @@
+         """
+         normalized_root = self._validate_uri_path(root_uri, field_name="root_uri")
+         processing_mode = normalize_processing_mode(processing_mode)
+-        await self._validate_batch_root(normalized_root, ctx=ctx)
++        root_leaf_cas = (
++            len(operations) == 1 and isinstance(operations[0], dict)
++            and operations[0].get("mode") == "replace"
++            and bool(operations[0].get("expected_sha256"))
++            and operations[0].get("uri", "").rpartition("/")[0] == normalized_root
++            and normalized_root.endswith("/memories")
++        )
++        await self._validate_batch_root(normalized_root, ctx=ctx, root_leaf_cas=root_leaf_cas)
+         normalized_operations = await self._normalize_batch_operations(
+             normalized_root, operations, ctx=ctx
+         )
+@@ -990,7 +997,7 @@
+         except ValueError as exc:
+             raise InvalidArgumentError(f"invalid {field_name}: {exc}") from exc
+ 
+-    async def _validate_batch_root(self, root_uri: str, *, ctx: RequestContext) -> None:
++    async def _validate_batch_root(self, root_uri: str, *, ctx: RequestContext, root_leaf_cas: bool = False) -> None:
+         classification = classify_uri(root_uri)
+         parts = uri_parts(root_uri)
+         is_root_system_skill_namespace = (
+@@ -1006,7 +1013,7 @@
+         if classification.context_type == "memory":
+             if (
+                 classification.content_index is None
+-                or len(parts) <= classification.content_index + 1
++                or (len(parts) <= classification.content_index + 1 and not root_leaf_cas)
+             ):
+                 raise InvalidArgumentError(
+                     "batch-write root must be inside a memory type directory"
+--- a/service/fs_service.py
++++ b/service/fs_service.py
+@@ -548,6 +548,7 @@
+         ctx: RequestContext,
+         recursive: bool = False,
+         wait: bool = False,
++        expected_sha256: str | None = None,
+     ) -> Optional[Dict[str, Any]]:
+         async def execute() -> Optional[Dict[str, Any]]:
+             return await self._rm(
+@@ -555,6 +556,7 @@
+                 ctx,
+                 recursive=recursive,
+                 wait=wait,
++                expected_sha256=expected_sha256,
+             )
+ 
+         result, _task_id = await run_tracked_operation(
+@@ -573,12 +575,13 @@
+         ctx: RequestContext,
+         recursive: bool = False,
+         wait: bool = False,
++        expected_sha256: str | None = None,
+     ) -> Optional[Dict[str, Any]]:
+         """Remove resource."""
+         viking_fs = self._ensure_initialized()
+         namespace_policy = namespace_policy_for_uri(uri)
+         if namespace_policy.processing_mode is NamespaceProcessingMode.FILE_ONLY:
+-            result = await viking_fs.rm(uri, recursive=recursive, ctx=ctx, no_vector=True)
++            result = await viking_fs.rm(uri, recursive=recursive, ctx=ctx, expected_sha256=expected_sha256, no_vector=True)
+             if isinstance(result, dict):
+                 result["semantic_status"] = "skipped"
+                 result["vector_status"] = "skipped"
+@@ -595,6 +598,7 @@
+                     result = await viking_fs.rm(
+                         uri,
+                         recursive=recursive,
++                        expected_sha256=expected_sha256,
+                         ctx=ctx,
+                         **({"lease_ref": lease} if lease is not None else {}),
+                     )
+@@ -615,7 +619,7 @@
+                     else await record_remove()
+                 )
+         else:
+-            result = await viking_fs.rm(uri, recursive=recursive, ctx=ctx)
++            result = await viking_fs.rm(uri, recursive=recursive, ctx=ctx, expected_sha256=expected_sha256)
+         await self._sync_watch_after_rm(uri, account_id=ctx.account_id, context_type=context_type)
+         # A refresh on a parent that no longer exists would lock its sidecar
+         # paths and thereby recreate the deleted directory. Nothing to
+@@ -1509,7 +1513,8 @@
+         ctx: RequestContext,
+         offset: int = 0,
+         limit: int = -1,
+-    ) -> str:
++        with_revision: bool = False,
++    ) -> str | dict:
+         """Read public content, hiding reserved metadata from memory files.
+         Accepts a Viking URI or a 32-char hex vector record id.
+         """
+@@ -1534,6 +1539,9 @@
+                     },
+                 )
+         resolved_uri, content = await self._read_content(resolved_uri, ctx)
++        if with_revision:
++            import hashlib
++            revision = hashlib.sha256(content.encode("utf-8")).hexdigest()
+         if classify_uri(resolved_uri).is_memory:
+             content = visible_content(content, uri=resolved_uri)
+         if self._privacy_sanitizer is not None:
+@@ -1549,7 +1557,7 @@
+                 )
+             ).content
+         if offset == 0 and limit == -1:
+-            return content
++            return {"text": content, "revision": revision} if with_revision else content
+         lines = content.splitlines(keepends=True)
+         sliced = lines[offset:] if limit == -1 else lines[offset : offset + limit]
+         return "".join(sliced)
+--- a/storage/viking_fs/_ops.py
++++ b/storage/viking_fs/_ops.py
+@@ -222,6 +222,7 @@
+         auto_pathlock: bool = True,
+         *,
+         no_vector: bool = False,
++        expected_sha256: str | None = None,
+     ) -> Dict[str, Any]:
+         """Delete file/directory + recursively update vector index.
+ 
+@@ -278,6 +279,9 @@
+                 if mapped is not None:
+                     raise mapped from exc
+                 raise
++            if expected_sha256 is not None:
++                from openviking_cli.exceptions import ConflictError
++                raise ConflictError("Expected file no longer exists")
+             if recursive:
+                 await self._ensure_access(target_uri, ctx, action=AclAction.MANAGE)
+             if no_vector:
+@@ -315,6 +319,14 @@
+                 raise ResourceBusyError(f"Resource is being processed: {uri}", uri=uri)
+ 
+         try:
++            if expected_sha256 is not None:
++                import hashlib
++                from openviking_cli.exceptions import ConflictError
++                if lease is None or is_dir:
++                    raise ConflictError("Expected a locked file")
++                content = await self.read_file_bytes(uri, ctx=ctx)
++                if hashlib.sha256(content).hexdigest() != expected_sha256:
++                    raise ConflictError("Content revision changed")
+             check_descendant_acl = (
+                 is_dir
+                 and (not no_vector or is_acl_uri(target_uri))
+--- a/server/routers/filesystem.py
++++ b/server/routers/filesystem.py
+@@ -298,6 +298,13 @@
+     return Response(status="ok", result={"uri": uri})
+ 
+ 
++@router.delete("/if-version")
++async def conditional_remove(uri: str, expected_sha256: str = Query(..., pattern="^[a-f0-9]{64}$"), _ctx: RequestContext = Depends(get_request_context)):
++    uri = validate_request_viking_uri(resolve_path_variables(uri), _ctx)
++    result = await get_service().fs.rm(uri, ctx=_ctx, recursive=False, wait=False, expected_sha256=expected_sha256)
++    return Response(status="ok", result=result)
++
++
+ @router.delete("")
+ async def rm(
+     uri: str = Query(..., description="Viking URI"),
+--- a/server/routers/content.py
++++ b/server/routers/content.py
+@@ -144,6 +144,13 @@
+     return uri
+ 
+ 
++@router.get("/versioned-read")
++async def versioned_read(uri: str, _ctx: RequestContext = Depends(get_request_context)):
++    uri = validate_request_viking_uri(resolve_path_variables(uri), _ctx)
++    result = await get_service().fs.read_visible(uri, ctx=_ctx, with_revision=True)
++    return Response(status="ok", result=result)
++
++
+ @router.get("/read")
+ async def read(
+     uri: str = Query(..., description="Viking URI"),
