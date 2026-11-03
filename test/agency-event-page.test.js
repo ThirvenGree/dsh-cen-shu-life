@@ -9,3 +9,16 @@ test('pages contain only requested life stages, with exclusive cursors and detac
  assert.deepEqual([...older.rows,...page.rows].map(r=>r.stage),Array.from({length:12},(_,i)=>i));
  assert.equal(older.olderBefore,null);assert.equal(feed.eventPage('missing').rows.length,0);assert.throws(()=>feed.eventPage('a',-1));
 });
+
+test('failed persistence can retry without a phantom receipt or skipped sequence',()=>{
+ let disk={version:1,sequence:0,generation:'gen',items:[]},fail=true;
+ const engine={read:()=>structuredClone(disk),now:()=>100,write:(_k,v)=>{if(fail)throw Error('disk');disk=structuredClone(v);}};
+ const feed=new LifeChangeFeed(engine),ticket={eventId:'book',stage:0,name:'旧书',stageText:'发现一张票根'};
+ assert.throws(()=>feed.append('event-start',ticket),/disk/);assert.equal(feed.record.sequence,0);
+ fail=false;feed.append('event-start',ticket);feed.append('event-start',ticket);
+ const restarted=new LifeChangeFeed(engine);assert.equal(restarted.record.sequence,1);
+ const found=restarted.searchEvents({query:'照片 票根',from:95,to:105});
+ assert.equal(found.candidates[0].eventId,'book');assert.equal(found.coverage.earliest,100);
+ assert.equal(restarted.eventPage('book').rows[0].id,found.candidates[0].observationId);
+ assert.equal(restarted.searchEvents({query:'票根',from:101}).total,0);assert.throws(()=>restarted.searchEvents({}));
+});
