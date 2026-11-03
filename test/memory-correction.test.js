@@ -34,3 +34,12 @@ test('Engram replacement follows the backend successor ID before revoking the ol
  const result=JSON.parse(await t.execute({backend:'engram',id:'old',target:'user',original:'A',replacement:'B',action:'replace'},{agent:{id:'qq'}}));
  assert.equal(result.status,'verified');assert.deepEqual(revoked,['A']);
 });
+test('Lingshu will not acknowledge deletion of a node whose text merely changed concurrently',async()=>{
+ let content='original',revoked=false;const db={};
+ const engine={config:{enabled:true},now:Date.now,bound:()=>true,read:(k,d)=>k.includes('integration')?{sessionId:'qq',qqPrivateId:'p'}:db[k]||d,write:(k,v)=>{db[k]=v}};
+ const tools={execute:async r=>{if(r.name==='mdcg_get')return {value:{id:'n',frontmatter:{layer:'knowledge'},content}};
+ assert.ok(isAuditedWrite(r));content='concurrent external update';return {value:{ok:true}};}};
+ const tool=correctionTool(engine,tools,{facts:()=>({key:'private:p',messages:[{id:'q',role:'user',text:'forget node n'}]}),review:async()=>({allow:true,reason:'fixture'}),revoke:()=>{revoked=true}});
+ await assert.rejects(tool.execute({backend:'lingshu',id:'n',target:'knowledge',original:'original',action:'remove'},{agent:{id:'qq'}}),/尚未核实/);
+ assert.equal(revoked,false);
+});
