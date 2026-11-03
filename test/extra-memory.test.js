@@ -30,7 +30,7 @@ test('external verification only revokes a proven change and keeps independent e
  const store={},engine={now:()=>1e6,bound:()=>true,read:(k,d)=>structuredClone(store[k]??d),write:(k,v)=>{store[k]=structuredClone(v)},profile:{evolvingFacts:[]},saveProfile(v){Object.assign(this.profile,v)}};
  const row={backend:'openviking',target:'user',id:'viking://user/fixture/memories/demo.md'};
  rememberRecord(engine,'qq',row,'same text');
- engine.profile.evolvingFacts=['memory:openviking_search','context:engram'].map((source,i)=>({id:'f'+i,evidence:[{id:'e'+i,source,text:'same text'}]}));
+ engine.profile.evolvingFacts=['memory:openviking_search','context:engram'].map((source,i)=>({id:'f'+i,evidence:[{id:'e'+i,source,text:'same text',...(i===0?{originalRecords:[row]}:{})}]}));
  await externalChecker(engine,async()=>{throw Error('offline')})();assert.equal(engine.profile.evolvingFacts.length,2);
  engine.now=()=>2e6;await externalChecker(engine,async()=>({absent:true}))();assert.deepEqual(engine.profile.evolvingFacts.map(x=>x.id),['f1']);
 });
