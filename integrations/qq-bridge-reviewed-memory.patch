@@ -1,0 +1,47 @@
+--- a/src/bridge.js
++++ b/src/bridge.js
+@@ -7180,6 +7180,11 @@
+           if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
+           if (req.headers['x-agent-token'] && !v2ToolEnabled('memory')) { sendJson({ ok: false, error: '工具未启用：qq_memory_*' }, 403); return; }
+           const st = getSocialV2State(key);
++          if(body.expectedOriginal!==undefined){
++            const expected=body.expectedOriginal;
++            const rows=category==='memberImpression'?(Object.hasOwn(st.memberImpressions||{},target)?[st.memberImpressions[target].traits?.join('、')]:[]):(category==='activeTopic'?st.activeTopics:st.pendingThoughts)?.map(x=>x.text);
++            if(typeof expected!=='string'||(category!=='memberImpression'&&expected!==oldContent)||!Array.isArray(rows)||rows.filter(text=>text===expected).length!==1||rows.includes(newContent)){sendJson({ok:false,error:'原文、条数或目标已变化'},409);return;}
++          }
+           if (category === 'activeTopic' && Array.isArray(st.activeTopics)) {
+             const idx = st.activeTopics.findIndex((t) => String(t?.text ?? '') === oldContent);
+             if (idx < 0) { sendJson({ ok: false, error: '找不到要编辑的 activeTopic' }, 404); return; }
+@@ -7231,9 +7236,10 @@
+           if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
+           if (req.headers['x-agent-token'] && !v2ToolEnabled('memory')) { sendJson({ ok: false, error: '工具未启用：qq_memory_query' }, 403); return; }
+           const st = getSocialV2State(key);
++          const full = url.searchParams.get('integrity') === '1';
+           const raw = {
+-            activeTopics: Array.isArray(st.activeTopics) ? st.activeTopics.slice(-20) : [],
+-            pendingThoughts: Array.isArray(st.pendingThoughts) ? st.pendingThoughts.filter((t) => !t.expiresAt || Date.now() < t.expiresAt).slice(-20) : [],
++            activeTopics: Array.isArray(st.activeTopics) ? (full ? st.activeTopics : st.activeTopics.slice(-20)) : [],
++            pendingThoughts: Array.isArray(st.pendingThoughts) ? (full ? st.pendingThoughts : st.pendingThoughts.filter((t) => !t.expiresAt || Date.now() < t.expiresAt).slice(-20)) : [],
+             memberImpressions: st.memberImpressions && typeof st.memberImpressions === 'object' ? st.memberImpressions : {}
+           };
+           if (category === 'activeTopic') {
+@@ -7246,6 +7252,7 @@
+             raw.activeTopics = [];
+             raw.pendingThoughts = [];
+           }
++          if (full) { sendJson({ok: true, key, integrity: 1, raw}); return; }
+           sendJson({ ok: true, key, category, formatted: formatMemoryV2({ ...st, ...raw }), raw });
+           return;
+         }
+@@ -7264,6 +7271,11 @@
+           if (req.headers['x-agent-token'] && !v2SessionAllowed(key)) { sendJson({ ok: false, error: '目标不在当前模式允许范围内' }, 403); return; }
+           if (req.headers['x-agent-token'] && !v2ToolEnabled('memory')) { sendJson({ ok: false, error: '工具未启用：qq_memory_remove' }, 403); return; }
+           const st = getSocialV2State(key);
++          if(body.expectedOriginal!==undefined){
++            const expected=body.expectedOriginal;
++            const rows=category==='memberImpression'?(Object.hasOwn(st.memberImpressions||{},target)?[st.memberImpressions[target].traits?.join('、')]:[]):(category==='activeTopic'?st.activeTopics:st.pendingThoughts)?.map(x=>x.text);
++            if(typeof expected!=='string'||(category!=='memberImpression'&&expected!==content)||!Array.isArray(rows)||rows.filter(text=>text===expected).length!==1){sendJson({ok:false,error:'原文、条数或目标已变化'},409);return;}
++          }
+           if (category === 'activeTopic' && Array.isArray(st.activeTopics)) {
+             st.activeTopics = st.activeTopics.filter((t) => String(t?.text ?? '') !== content);
+           } else if (category === 'pendingThought' && Array.isArray(st.pendingThoughts)) {
