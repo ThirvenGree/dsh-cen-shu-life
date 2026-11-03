@@ -17,6 +17,7 @@ test('agency handoffs and personal turns are never a user message, even if they 
  const msg=(kind,text)=>({role:'user',source:{kind},content:[{type:'text',text}]});
  assert.equal(incomingText(msg('plugin:dsh-censhu-agency','【内部主动联系，非青枔来信】请处理本轮联系。')),'');
  assert.equal(incomingText(msg('plugin:dsh-censhu-agency','【本次消息快照】{"messages":[{"text":"内部资料"}]}')),'');
+ assert.equal(incomingText(msg('plugin:dsh-some-other','我好难受')),'');
  assert.equal(incomingText(msg('user','我看到了')),'我看到了');
 });
 test('reviewed write permits are scoped to the exact operation and disappear after use',async()=>{

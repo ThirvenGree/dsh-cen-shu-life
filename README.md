@@ -464,3 +464,5 @@ readMood 返回鱼的心情 mixedMood；生活决策保留多个分量及其矛�
 
 ### 独立复核的本机配置
 生活判断、人物演化、生活积累由 Gemini 生成、GPT-6.1 Terra 独立复核。请在启动 DSH 的本机环境配置 `OPENAI_API_KEY`。缺少密钥时上述任务等待配置，设置页显示“独立审核未配置”；配置后重启 DSH。密钥存在只代表已配置，API 权限、余额和网络仍以实际调用结果为准。独处日记继续由 Gemini 审核。
+
+绑定 QQ 可用 `censhu_correct_memory` 按完整原文更正或撤回一条记忆。支持记忆演化的 memory/de_memory、Mnemon 运行时和指定编号的 Engram；以近期真实来信核验，Terra 批准后才调用对应后端，并回读确认。逐条处理，不跨库批量替换。新审核通过的记忆也写入 Mnemon 运行时；身份事实与角色生活分别使用 user / memory 轨，不追补旧队列。
