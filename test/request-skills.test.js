@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {inspectSkillCatalog,applySkillCatalog,querySkillCatalog} from '../lib/request-skills.js';
+import {inspectSkillCatalog,applySkillCatalog,querySkillCatalog,collapseSkillCatalog} from '../lib/request-skills.js';
 
 const escape=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const entries=[{name:'poetry',description:'诗句翻译与 <意象> & 节奏'},{name:'browser',description:'操作本机浏览器'}, {name:'audio',description:'语音生成'}];
@@ -19,6 +19,24 @@ test('only model-selected catalog summaries are projected; immutable original an
  assert.match(out.messages[1].content[0].text,/诗句翻译与 &lt;意象&gt; &amp; 节奏/);
  assert.ok(out.messages[1].content[0].text.endsWith(suffix.slice(suffix.indexOf('\n\n'))));
  assert.match(out.messages[1].content[0].text,/"target":"skills"/);
+});
+
+test('hundreds of superseded host catalogs collapse even without relevance planning; loaded skills and history survive',()=>{
+ const loaded={role:'tool',toolCallId:'skill-call',content:'<skill_content>操作要求</skill_content>'};
+ const bare=()=>{const c=catalog();c.content[0].text=c.content[0].text.match(/<available_skills>[\s\S]*?<\/available_skills>/)[0];return c;};
+ const original=freeze([...Array.from({length:200},(_,i)=>({...bare(),id:'old-'+i})),loaded,bare()]);
+ const collapsed=collapseSkillCatalog(original);assert.equal(original.length,202);assert.equal(collapsed.length,2);
+ assert.strictEqual(collapsed[0],loaded);assert.strictEqual(collapsed[1],original.at(-1));
+ const unknown={...catalog(),source:{kind:'skill-catalog',form:'future'}};
+ const future=[...original,unknown];assert.strictEqual(collapseSkillCatalog(future),future);
+});
+
+test('superseded catalogs with unknown extra instructions are preserved',()=>{
+ const old=catalog();old.content[0].text+='\nAdditional policy: retain original access checks.';
+ const next=catalog();const messages=[old,next];
+ assert.strictEqual(collapseSkillCatalog(messages),messages);
+ const selected=applySkillCatalog(messages,inspectSkillCatalog(messages),[]);
+ assert.match(selected.messages[0].content[0].text,/Additional policy: retain original access checks/);
 });
 
 test('an empty choice retains discovery and every skill remains loadable through original tool',()=>{

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {createRequestContext,requestPlanSchema} from '../lib/request-context.js';
+import {createRequestContext,requestPlanSchema,requestSchemaFor} from '../lib/request-context.js';
 import {createRequestOriginals} from '../lib/request-originals.js';
 
 function freeze(value){if(value&&typeof value==='object'&&!Object.isFrozen(value)){Object.freeze(value);for(const part of Object.values(value))freeze(part);}return value;}
@@ -46,6 +46,28 @@ test('tool and skill selection coexist; hidden skills remain discoverable and or
  f.project.recordUsage('session-fixture',{inputTokens:1234,outputTokens:40});assert.equal(f.project.status()[0].reported.inputTokens,1234);
 });
 
+test('invalid result offsets preserve originals without blocking valid tools or the following skill decision',async t=>{
+ let calls=0;
+ const f=fixture(t,{plan:input=>{
+  calls++;
+  return {keepTools:input.toolsSelectionNeeded?['search_next']:[],keepSkills:input.skillsSelectionNeeded?['poetry']:[],
+   results:input.results.map(row=>({id:row.id,mode:'excerpt',outcome:'data',ranges:[{part:0,start:0,end:999999}],criticalRanges:[],reason:'bad model offset'})),reason:'Capabilities selected for the current task'};
+ }});
+ const entries=[{name:'poetry',description:'翻译诗句'},{name:'audio',description:'制作语音'}];
+ const skill={role:'user',source:{kind:'skill-catalog',form:'catalog',entries},content:[{type:'text',text:'<available_skills>\n'+entries.map(e=>'- `'+e.name+'`: '+e.description).join('\n')+'\n</available_skills>'}]};
+ f.request.messages.push(skill);f.request.tools.push(definition('skill'));freeze(f.request);
+ const before=JSON.stringify(f.request),out=await f.project.transform(f.request);
+ assert.equal(calls,2,'the valid tool decision and following skill job both complete');
+ assert.equal(JSON.stringify(f.request),before);assert.strictEqual(out.messages[2],f.request.messages[2],'invalid result presentation retains its entire original');
+ assert.ok(out.tools.some(tool=>tool.name==='search_next'));assert.ok(!out.tools.some(tool=>tool.name==='unused_one'));
+ assert.deepEqual(out.messages.at(-1).source.entries,[entries[0]],'result validation failure does not prevent skill selection');
+ const stats=f.project.status()[0];assert.equal(stats.mode,'partial');assert.equal(stats.resultFailures.length,1);assert.ok(stats.retryAt>stats.at);
+ assert.match(stats.reason,/结果保留原文/);
+ const retry=await f.project.transform(f.request);assert.equal(calls,2,'bad result planning observes backoff');
+ assert.strictEqual(retry.messages[2],f.request.messages[2]);assert.ok(!retry.tools.some(tool=>tool.name==='unused_one'));
+ assert.deepEqual(retry.messages.at(-1).source.entries,[entries[0]],'valid capability plans remain usable during result backoff');
+});
+
 test('failed skill planning preserves catalog; backoff retains the failure reason; tool choice required stays meaningful',async t=>{
  const f=fixture(t,{plan:()=>{throw Object.assign(Error('Provider temporarily unavailable'),{httpStatus:429});}});
  await f.project.transform(f.request);await f.project.transform(f.request);
@@ -67,6 +89,21 @@ test('life internal task is visible as context, and loaded skill instructions ar
  assert.equal(f.input().topic,'现在继续自己的绘画项目');assert.match(f.input().taskContext.currentInstructions,/窗框/);
  assert.match(f.input().taskContext.authorization,/not a new user permission/);
  assert.equal(f.input().results.length,0);assert.equal(out.messages.at(-1).content,content);
+});
+
+test('obsolete catalogs do not return when Gemini fails; provider schema only admits names in the current batch',async t=>{
+ const f=fixture(t,{plan:()=>{throw Error('unavailable');}});
+ const entries=[{name:'skill-a',description:'目录说明'.repeat(300)}];
+ const skill={role:'user',source:{kind:'skill-catalog',form:'catalog',entries},content:[{type:'text',text:'<available_skills>\n- `skill-a`: '+entries[0].description+'\n</available_skills>'}]};
+ f.request.messages=[...Array.from({length:216},(_,i)=>({...skill,id:'skill-'+i})),{role:'user',content:'翻译诗句'}];
+ f.request.tools.push(definition('skill'));freeze(f.request);
+ const out=await f.project.transform(f.request);assert.equal(f.request.messages.length,217);assert.equal(out.messages.length,2);
+ assert.equal(out.messages[0].id,'skill-215');assert.equal(f.project.status()[0].skillSnapshotsBefore,216);assert.equal(f.project.status()[0].skillSnapshotsAfter,1);
+ assert.strictEqual(out.tools,f.request.tools);assert.equal(out.messages[0].source.entries.length,1);
+ const schema=requestSchemaFor({toolsSelectionNeeded:true,tools:[{name:'read'}],skillsSelectionNeeded:false,skills:[]});
+ assert.deepEqual(schema.properties.keepTools.items.enum,['read']);assert.equal(schema.properties.keepTools.maxItems,undefined);assert.equal(schema.properties.keepSkills.maxItems,0);
+ const large=requestSchemaFor({toolsSelectionNeeded:true,tools:Array.from({length:460},(_,i)=>({name:'tool_'+i}))});
+ assert.equal(large.properties.keepTools.items.enum.length,460);assert.equal(large.properties.keepTools.maxItems,undefined);
 });
 
 test('frozen request becomes a clone; exact original, metadata, media, tool pairs and required definitions survive',async t=>{
@@ -145,14 +182,14 @@ test('a planner response cannot adopt an updated semantic configuration as its o
  assert.equal(await pending,f.request);assert.equal(f.project.status().length,0);
 });
 
-test('planner failure, invalid names and invalid ranges preserve complete request; cooldown avoids repeated model calls',async t=>{
+test('planner failures preserve requests, while invalid result ranges do not revoke valid capability choices',async t=>{
  let now=100,calls=0;
  const f=fixture(t,{now:()=>now,plan:()=>{calls++;throw Error('model down');}});
  assert.strictEqual(await f.project.transform(f.request),f.request);assert.strictEqual(await f.project.transform(f.request),f.request);assert.equal(calls,1);
  now+=30001;await f.project.transform(f.request);assert.equal(calls,2);
- for(const decision of [input=>({keepTools:['not-real'],results:[],reason:'bad'}),input=>({keepTools:[],results:input.results.map(row=>({id:row.id,mode:'excerpt',outcome:'data',ranges:[{part:0,start:0,end:999999}],criticalRanges:[],reason:'bad'})),reason:'bad'})]){
-  const bad=fixture(t,{plan:decision});assert.strictEqual(await bad.project.transform(bad.request),bad.request);
- }
+ const badNames=fixture(t,{plan:()=>({keepTools:['not-real'],results:[],reason:'bad'})});assert.strictEqual(await badNames.project.transform(badNames.request),badNames.request);
+ const badRange=fixture(t,{plan:input=>({keepTools:[],results:input.results.map(row=>({id:row.id,mode:'excerpt',outcome:'data',ranges:[{part:0,start:0,end:999999}],criticalRanges:[],reason:'bad'})),reason:'bad'})});
+ const partial=await badRange.project.transform(badRange.request);assert.strictEqual(partial.messages,badRange.request.messages);assert.ok(partial.tools.length<badRange.request.tools.length);assert.equal(badRange.project.status()[0].mode,'partial');
 });
 
 test('model chooses interior excerpts and essential receipts; code copies only exact offsets and retains errors whole',async t=>{
@@ -163,12 +200,12 @@ test('model chooses interior excerpts and essential receipts; code copies only e
  assert.equal(read(f,{...pointer(out.messages[2].content[0].text),limit:8000}).text,body);
  f.request.messages[2].isError=true;const error=await f.project.transform(f.request);assert.strictEqual(error.messages[2],f.request.messages[2]);
  const invalid=fixture(t,{plan:input=>({keepTools:[],results:input.results.map(row=>({id:row.id,mode:'reference',outcome:'receipt',ranges:[],criticalRanges:[],reason:'错误遗漏回执'})),reason:'bad'})});
- assert.strictEqual(await invalid.project.transform(invalid.request),invalid.request);
+ assert.strictEqual((await invalid.project.transform(invalid.request)).messages,invalid.request.messages);
 });
 
 test('explicit model error classification cannot replace the error with a reference',async t=>{
  const f=fixture(t,{plan:input=>({keepTools:[],results:input.results.map(row=>({id:row.id,mode:'reference',outcome:'error',ranges:[],criticalRanges:[],reason:'bad'})),reason:'bad'})});
- assert.strictEqual(await f.project.transform(f.request),f.request);
+ assert.strictEqual((await f.project.transform(f.request)).messages,f.request.messages);
 });
 
 test('originals remain readable after reload, are session isolated, and versions cannot drift',async t=>{
@@ -210,7 +247,7 @@ test('Unicode read paging never splits a surrogate pair, and UTF-16 planner boun
  const out=await f.project.transform(f.request),p=pointer(out.messages[2].content[0].text);
  assert.equal(read(f,{...p,limit:1}).text,'😀');assert.equal(read(f,{...p,offset:1,limit:10}).available,false);
  const invalid=fixture(t,{plan:input=>({keepTools:[],results:input.results.map(row=>({id:row.id,mode:'excerpt',outcome:'data',ranges:[{part:0,start:1,end:3}],criticalRanges:[],reason:'bad'})),reason:'bad'})});invalid.request.messages=messages(body);
- assert.strictEqual(await invalid.project.transform(invalid.request),invalid.request);
+ assert.strictEqual((await invalid.project.transform(invalid.request)).messages,invalid.request.messages);
 });
 
 test('archived, retired, aborted, disposed, or sessionless requests retain original identity',async t=>{
