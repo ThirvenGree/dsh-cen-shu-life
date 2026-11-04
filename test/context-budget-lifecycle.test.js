@@ -53,3 +53,33 @@ test('archive blocks new assemblies until restored, and dispose invalidates an o
  assert.deepEqual(await task,{contexts:[],sections:[]});assert.deepEqual(late.status(),[]);
  assert.equal(recall(late,unresolved).reason,'disposed');
 });
+
+for(const stage of ['basis','planner','window','downstream','collector'])test('host abort promptly wakes the '+stage+' wait and preserves its exact abort reason',{timeout:1500},async()=>{
+ const entered=deferred(),never=deferred(),controller=new AbortController(),agent=actor('session-abort-'+stage),base={contexts:[],sections:[]};
+ if(stage==='window')agent.session.requestContext=()=>({model:'fixture'});
+ const wait=()=>{entered.resolve();return never.promise;};
+ const budget=roleContextBudget({prepareBasis:stage==='basis'?({request})=>{assert.ok(request.signal);return wait();}:undefined,resolveWindow:stage==='window'?wait:undefined,plan:stage==='planner'?wait:plan});
+ try{
+  const task=budget.assemble(agent,stage==='downstream'?wait:()=>base,stage==='collector'?wait:out=>collect(budget,agent,out),{signal:controller.signal,assembly:base});
+  await entered.promise;const reason=Object.assign(Error('original host cancelled'),{name:'AbortError'});controller.abort(reason);
+  await assert.rejects(task,error=>error===reason);assert.deepEqual(budget.status(),[]);assert.equal(recall(budget,agent).available,false);
+ }finally{budget.dispose();}
+});
+
+for(const action of ['forget','endTurn','dispose'])test(action+' wakes an awaited planner without waiting for the underlying job',{timeout:1500},async()=>{
+ const entered=deferred(),late=deferred(),agent=actor('session-lifecycle-'+action),base={contexts:[],sections:[]};
+ const budget=roleContextBudget({plan:async input=>{entered.resolve();await late.promise;return plan(input);}});
+ const task=build(budget,agent,()=>base);await entered.promise;budget[action](agent.session.id);
+ assert.strictEqual(await task,base);assert.deepEqual(budget.status(),[]);assert.equal(recall(budget,agent).available,false);
+ late.resolve();await Promise.resolve();assert.deepEqual(budget.status(),[]);budget.dispose();
+});
+
+test('a configuration change during planning cannot relabel an old decision with the new scope',{timeout:1500},async()=>{
+ let scope='enabled';const entered=deferred(),late=deferred(),agent=actor('session-scope'),base={contexts:[],sections:[]};
+ const budget=roleContextBudget({planScope:()=>scope,plan:async input=>{entered.resolve();await late.promise;return plan(input);}});
+ try{
+  const task=build(budget,agent,()=>base);await entered.promise;scope='disabled';late.resolve();
+  assert.strictEqual(await task,base);assert.deepEqual(budget.status(),[]);assert.equal(recall(budget,agent).available,false);
+  const request={sessionId:agent.session.id,model:'fixture',messages:[]};assert.strictEqual(budget.prepareRequest(request),request);
+ }finally{budget.dispose();}
+});
