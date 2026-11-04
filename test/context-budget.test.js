@@ -28,11 +28,13 @@ test('a change of topic changes allocation; valid plan can exceed the former 800
   assert.equal(result.contexts.at(-1).text.includes('原文'),topic==='细读');assert.equal(b.status()[0].byOwner.inner.requested,topic==='细读'?18000:0);
  }
 });
-test('honours full reply reservation, limits optional output, reports an impossible required context without submitting it',async()=>{
+test('honours full reply reservation, limits optional output and defers capacity pressure to existing compaction',async()=>{
  const b=roleContextBudget({plan:input=>decision(input,input.candidates.filter(r=>!r.required).map(r=>r.id),[999999,999999,10])});
  await b.add(base,agent(10000,'事项','a',7500),'contexts','cen-shu-life',[parts[0],{text:'案'.repeat(3000)}]);
  const row=b.status()[0];assert.equal(row.reserve,7500);assert.ok(row.used<=row.available&&row.limit<=row.available);assert.equal(row.byOwner.life.kept,1);
- await assert.rejects(()=>b.add({...base,tools:[{description:'文'.repeat(10000)}]},agent(8192),'contexts','cen-shu-life',parts),/回复预留/);assert.equal(b.status()[0].blocked,true);
+ const pressured=await b.add({...base,tools:[{description:'文'.repeat(10000)}]},agent(8192),'contexts','cen-shu-life',parts);
+ assert.match(pressured.contexts.at(-1).text,/本轮必须保留/);assert.doesNotMatch(pressured.contexts.at(-1).text,/天气|独处日记/);
+ assert.equal(b.status()[0].blocked,false);assert.equal(b.status()[0].pressure.state,'awaiting-compaction');assert.equal(b.status()[0].pressure.cause,'non-compressible');
 });
 test('outage backs off and retains representatives, then recovers; wrong route never authorizes optional context',async()=>{
  let calls=0,t=10000;
@@ -53,4 +55,45 @@ test('a history append while planning consumes the available space before admiss
  const budget=roleContextBudget({plan:input=>{chat+='字'.repeat(7600);return decision(input,[1],[10000,0,0]);}});
  await budget.add(base,a,'contexts','cen-shu-life',[parts[0],{text:'事'.repeat(800)}]);
  const row=budget.status()[0];assert.equal(row.byOwner.life.kept,1);assert.ok(row.available<800&&row.used<=row.available);assert.match(row.detail,/按窗口裁剪/);
+});
+
+test('omitted temporary observations have exact paginated receipts and model-selected recall cues',async()=>{
+ const a=agent(32768,'画上的窗扣');
+ const observation='【临时观察】旧窗扣右侧缺一颗螺钉。'+'原文细节'.repeat(500);
+ const budget=roleContextBudget({plan:input=>({...decision(input,[],[800,0,0]),recall:[{id:1,when:'比较窗扣时核对原文，不凭简短摘要补全'}]})});
+ const output=await budget.add(base,a,'contexts','cen-shu-life',[parts[0],{owner:'inner',key:'observation:window',text:observation}]);
+ const state=budget.status()[0],manifest=output.sections.find(s=>s.name==='censhu-context-recall');
+ assert.equal(state.recall.available,true);assert.equal(state.recall.cues,1);assert.match(manifest.text,/比较窗扣时核对原文/);
+ assert.doesNotMatch(JSON.stringify(output),/右侧缺一颗螺钉/);
+ const tool=budget.recallTool(),run=args=>JSON.parse(tool.execute(args,{agent:a}));
+ const catalog=run({action:'catalog',snapshotId:state.recall.snapshotId,version:state.recall.version});
+ const item=catalog.entries.find(e=>e.key==='observation:window');assert(item);assert.equal(item.selected,false);
+ let offset=0,joined='';
+ do {const page=run({action:'read',snapshotId:state.recall.snapshotId,version:state.recall.version,itemId:item.itemId,offset,limit:400});assert.equal(page.status,'ready');joined+=page.text;offset=page.nextOffset;}while(offset!==null);
+ assert.equal(joined,observation);assert.equal(run({action:'catalog',snapshotId:'missing',version:state.recall.version}).available,false);
+ assert.doesNotMatch(JSON.stringify(budget.status()),/右侧缺一颗螺钉/);
+ budget.dispose();assert.equal(run({action:'catalog'}).available,false);
+});
+
+test('pressure still records an exact snapshot without injecting an unfunded pointer',async()=>{
+ const a=agent(8192);a.session.deriveMessages=()=>[{role:'tool',content:'超长工具结果'.repeat(2000)}];
+ let plans=0;const budget=roleContextBudget({plan:()=>{plans++;throw Error('not needed');}});
+ const result=await budget.add(base,a,'contexts','cen-shu-life',parts);
+ assert.equal(plans,0);assert.equal(budget.status()[0].pressure.state,'awaiting-compaction');
+ assert.equal(result.sections.some(s=>s.name==='censhu-context-recall'),false);
+ const catalog=JSON.parse(budget.recallTool().execute({action:'catalog'},{agent:a}));
+ assert.equal(catalog.status,'ready');assert.equal(catalog.entries.length,parts.length);
+ budget.observe({sessionId:a.session.id,model:'model',messages:[{role:'user',content:'压缩后的历史'}],tools:[]});
+ assert.equal(budget.status()[0].pressure.state,'request-observed');
+});
+
+test('retrieval hints obey the model total and duplicate mandatory keys do not cause false pressure',async()=>{
+ for(const quota of [10,100,500]){
+  const budget=roleContextBudget({plan:input=>decision(input,[],[quota,0,0])});
+  await budget.add(base,agent(),'contexts','cen-shu-life',parts);
+  const status=budget.status()[0];assert.ok(status.used<=status.limit);assert.ok(status.used<=status.available);
+ }
+ let calls=0;const budget=roleContextBudget({plan:input=>{calls++;assert.equal(input.requiredBy.life,4001);return decision(input,[],[6000,0,0]);}});
+ await budget.add(base,agent(8192),'contexts','cen-shu-life',[{key:'same-event',required:true,text:'必'.repeat(4000)},{key:'same-event',required:true,text:'必'.repeat(4000)},{text:'其他观察'}]);
+ assert.equal(calls,1);assert.equal(budget.status()[0].pressure,null);assert.equal(budget.status()[0].byOwner.life.kept,1);
 });
