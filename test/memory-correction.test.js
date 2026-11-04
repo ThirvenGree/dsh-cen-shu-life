@@ -18,7 +18,7 @@ for(const mn of [true,false])test('verified correction changes exactly one entry
  const f=fixture({mn});assert.equal(JSON.parse(await f.run()).status,'verified');assert.deepEqual(f.rows,[f.updated,f.food]);assert.deepEqual(f.revoked,[f.old]);assert.equal(JSON.parse(await f.run()).replayed,true);assert.equal(f.writes,1);
 });
 test('missing real message, ambiguous originals and negative audit never write',async()=>{
- const f=fixture({allow:false});assert.equal(JSON.parse(await f.run()).status,'not-approved');f.rows.push(f.old);await assert.rejects(f.run(),/不唯一/);f.messages.length=0;await assert.rejects(f.run(),/真实QQ/);assert.equal(f.writes,0);
+ const f=fixture({allow:false});assert.equal(JSON.parse(await f.run()).status,'not-approved');f.rows.push(f.old);await assert.rejects(f.run(),/不唯一/);f.messages.length=0;await assert.rejects(f.run(),/真实用户/);assert.equal(f.writes,0);
 });
 test('forget verifies absence and reconciles lost receipt without repeating deletion',async()=>{
  const f=fixture({loseReply:true});f.messages[0].text='忘掉说喜欢这本书的那条记忆';const args={action:'remove',replacement:undefined};

@@ -60,6 +60,13 @@ if(!source.includes('d.lifeContributionReceipts ='))replaceOnce('    d.lifeEvent
 source=patchExpressions(patchTimedMood(patchMoodFeedback(source)));
 source=source.replace("const 自主搭话 = new Set(['speak-up'])","const 自主搭话 = new Set(['speak-up', 'censhu-inner-life-notice'])");
 
+// cen-shu-life desktop-bindings v1: keep the third-party adaptation reproducible.
+if(!source.includes('// cen-shu-life desktop-bindings v1')){
+ replaceOnce("bound as censhuBound, context as censhuContext", "bound as qqCenshuBound, context as censhuContext");
+ replaceOnce("export const name = 'feiyu-mood'", "// cen-shu-life desktop-bindings v1\nimport {linkedRoleSlots,roleContextBound as censhuBound} from 'dsh-cen-shu-life/mood-link'\nexport const name = 'feiyu-mood'");
+ replaceOnce("    return out\n  }\n  第一份键", "    return linkedRoleSlots(out, CFG_DIR)\n  }\n  第一份键");
+}
+
 execFileSync(process.execPath,['--check','--input-type=module'],{input:source,stdio:['pipe','pipe','pipe'],env:{...process.env,ELECTRON_RUN_AS_NODE:'1'},windowsHide:true});
 const home=process.env.DSH_HOME||path.join(os.homedir(),'.dsh');
 synchronizeMoodAdapters(home,file,source,{validateOnly:true});
