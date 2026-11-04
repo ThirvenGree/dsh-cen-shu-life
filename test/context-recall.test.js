@@ -123,3 +123,92 @@ test('registered tool binds only to the invoking agent and remains a read-only t
  assert.match(JSON.parse(first).media,/not proof/);
  assert.deepEqual(tool.output.render({},first),[{type:'text',text:first}]);
 });
+
+test('turn read receipts track successful delivered ranges, not catalogs, failures or duplicate pages',()=>{
+ const service=createContextRecall(),input=rows('abcdefghijkl'),snapshot=service.publish('one',input);
+ service.setTurn('one','turn-1');
+ service.read('one',{action:'catalog'});
+ service.read('one',{...readArgs(snapshot),version:'0'.repeat(64)});
+ service.read('one',{...readArgs(snapshot),itemId:'missing'});
+ service.read('one',{...readArgs(snapshot),offset:99});
+ service.read('one',{...readArgs(snapshot),offset:12});
+ assert.deepEqual(service.receipts('one'),[]);
+ assert.equal(service.readState('one',input)[0].complete,false);
+ service.read('one',{...readArgs(snapshot),limit:6});
+ service.read('one',{...readArgs(snapshot),offset:1,limit:3});
+ let state=service.readState('one',input)[0];
+ assert.equal(state.itemId,snapshot.entries[0].itemId);assert.equal(state.readChars,6);
+ assert.deepEqual(state.ranges,[[0,6]]);assert.equal(state.complete,false);
+ service.read('one',{...readArgs(snapshot),offset:9,limit:3});
+ state=service.readState('one',input)[0];assert.equal(state.readChars,9);assert.equal(state.complete,false);
+ assert.deepEqual(state.ranges,[[0,6],[9,12]]);
+ service.read('one',{...readArgs(snapshot),offset:6,limit:3});
+ state=service.readState('one',input)[0];assert.equal(state.readChars,12);assert.equal(state.complete,true);
+ assert.deepEqual(state.ranges,[[0,12]]);assert.equal(service.receipts('one').length,1);
+ state.ranges[0][1]=100;
+ const receipts=service.receipts('one');receipts[0].ranges[0][1]=200;
+ assert.deepEqual(service.readState('one',input)[0].ranges,[[0,12]],'returned metadata cannot mutate receipts');
+});
+
+test('read identity survives new snapshots and row IDs but never carries across content or source changes',()=>{
+ const service=createContextRecall(),input=rows('同一份原文'),old=service.publish('one',input);
+ service.setTurn('one','turn-1');service.read('one',readArgs(old));
+ const reordered=input.map(row=>({...row,id:row.id+40})).reverse(),next=service.publish('one',reordered);
+ assert.notEqual(next.snapshotId,old.snapshotId);
+ const same=service.readState('one',reordered).find(row=>row.id===40);
+ assert.equal(same.complete,true);assert.equal(same.itemId,next.entries.find(row=>row.rowId===40).itemId);
+ assert.notEqual(same.itemId,old.entries[0].itemId);
+ for(const changed of [{text:'发生变化的原文'},{key:'another-event'},{owner:'agency'},{source:'other-source'}]){
+  const check=[{...input[0],...changed,id:99}];
+  assert.equal(service.readState('one',check)[0].complete,false);
+  assert.equal(service.readState('one',check)[0].readChars,0);
+ }
+ service.setTurn('one','turn-2');
+ assert.equal(service.readState('one',reordered).find(row=>row.id===40).complete,false);
+ service.read('one',readArgs(old));
+ assert.equal(service.readState('one',reordered).find(row=>row.id===40).complete,true,
+  'reading a retained older snapshot counts only for the exact matching source version');
+});
+
+test('read receipts are isolated by active host turn and session and cleared by lifecycle cleanup',()=>{
+ const service=createContextRecall(),input=rows('上下文原文'),one=service.publish('one',input),two=service.publish('two',input);
+ service.read('one',readArgs(one));assert.deepEqual(service.receipts('one'),[],'no implicit turn from tool parameters');
+ service.setTurn('one','turn-1');service.setTurn('two','turn-1');
+ service.read('one',readArgs(one));service.setTurn('one','turn-1');
+ assert.equal(service.readState('one',input)[0].complete,true,'reassembly does not clear the current turn');
+ assert.equal(service.readState('two',input)[0].complete,false);
+ assert.equal(service.read('two',readArgs(one)).status,'forbidden');assert.deepEqual(service.receipts('two'),[]);
+ service.read('two',readArgs(two));assert.equal(service.readState('two',input)[0].complete,true);
+ service.setTurn('one','turn-2');assert.deepEqual(service.receipts('one'),[]);
+ assert.equal(service.readState('two',input)[0].complete,true,'another turn must not clear this session');
+ service.read('one',readArgs(one));service.forget('one');assert.deepEqual(service.receipts('one'),[]);
+ assert.equal(service.readState('one',input)[0].complete,false);assert.equal(service.read('one',readArgs(one)).available,false);
+ assert.equal(service.setTurn('two',null).available,true);assert.deepEqual(service.receipts('two'),[],'turn end cannot reuse previous receipts');
+ assert.equal(service.read('two',readArgs(two)).text,'上下文原文','ending a turn preserves source snapshots');
+ assert.deepEqual(service.receipts('two'),[]);
+ service.setTurn('two','turn-empty');service.read('two',readArgs(two));
+ assert.equal(service.setTurn('two').available,true);assert.deepEqual(service.receipts('two'),[]);
+ service.setTurn('two','turn-invalid');service.read('two',readArgs(two));
+ assert.equal(service.setTurn('two','').available,false);assert.deepEqual(service.receipts('two'),[]);
+ service.setTurn('two','turn-3');service.read('two',readArgs(two));service.dispose();
+ assert.deepEqual(service.receipts('two'),[]);assert.deepEqual(service.readState('two',input),[]);
+ assert.equal(service.setTurn('two','turn-4').available,false);
+});
+
+test('read accounting uses actual output length and has bounded receipts and range fragments',()=>{
+ const service=createContextRecall({maxReadReceipts:2,maxReadRanges:2});
+ const input=[{id:0,owner:'life',text:'\u0001'.repeat(12000)},{id:1,owner:'inner',text:'0123456789'},
+  {id:2,owner:'agency',text:'第三项'}],snapshot=service.publish('one',input);
+ service.setTurn('one','turn-1');
+ const output=service.read('one',{...readArgs(snapshot),limit:4000});
+ assert.ok(output.text.length<4000);assert.equal(service.readState('one',input)[0].readChars,output.text.length);
+ for(const offset of [0,3,6])service.read('one',{...readArgs(snapshot,1),offset,limit:1});
+ const fragmented=service.readState('one',input)[1];
+ assert.equal(fragmented.ranges.length,2);assert.equal(fragmented.readChars,2);assert.equal(fragmented.complete,false);
+ service.read('one',readArgs(snapshot,2));
+ assert.equal(service.receipts('one').length,2);assert.equal(service.readState('one',input)[0].readChars,0,
+  'eviction forgets coverage rather than claiming unread text was read');
+ service.read('one',readArgs(snapshot,1));assert.equal(service.readState('one',input)[1].complete,true);
+ for(let n=0;n<130;n++)service.setTurn('new-'+n,'turn');
+ assert.deepEqual(service.receipts('one'),[],'turn metadata has a bounded session count too');
+});
