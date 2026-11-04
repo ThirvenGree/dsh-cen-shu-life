@@ -9,6 +9,19 @@ if (isInternalMessage(p)) return null
 if (isInternalMessage(msg)) { lastText = ''; lastSrc = msg.source.kind; return }
 if (!stillBound() || isInternalMessage({source:{kind:lastSrc}})) return`;
 const hash=x=>createHash('sha256').update(x).digest('hex');
+test('mood 0.8.7 diagnostic block keeps isolation and both file attestations',()=>{
+ const modern=isolation.replace('if (!stillBound() || isInternalMessage({source:{kind:lastSrc}})) return',"if (!stillBound()) {\n          diag('turn-stopping unbound')\n          return\n        }\n        if (isInternalMessage({source:{kind:lastSrc}})) return");
+ assert.equal(verifyMoodIsolation(modern),true);
+ assert.equal(verifyMoodIsolation(modern.replace('isPrivateSession,isInternalMessage}', 'isPrivateSession,isInternalMessage,isProbeWorkspace}')),true);
+ assert.equal(verifyMoodIsolation(modern.replace('if (isInternalMessage({source:{kind:lastSrc}})) return','')),false);
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'adapter-mood087-'));try{
+  const file=path.join(home,'index.js'),lp=path.join(home,'cen-shu-life/mood-link-install.json'),ip=path.join(home,'censhu-inner-life/isolation-adapters.json'),source=life+'\n'+modern;
+  fs.mkdirSync(path.dirname(lp));fs.mkdirSync(path.dirname(ip));fs.writeFileSync(file,source);
+  fs.writeFileSync(lp,JSON.stringify({protocol:3,moduleUrl:pathToFileURL(file).href,sourceSha256:sourceHash(life+'\n'+isolation),installedAt:1}));
+  fs.writeFileSync(ip,JSON.stringify({version:1,protocol:'censhu-private-session-v1',files:[{file,hash:hash(life+'\n'+isolation)}]}));
+  const result=synchronizeMoodAdapters(home,file,source);assert.deepEqual(result.skipped,[]);assert.deepEqual(result.updated.sort(),['isolation','life']);assert.equal(adapterHealth(home).ready,true);assert.equal(JSON.parse(fs.readFileSync(ip)).files[0].hash,hash(source));
+ }finally{fs.rmSync(home,{recursive:true,force:true});}
+});
 for(const order of [['life','isolation'],['isolation','life']])test('both whole-file attestations survive install order '+order.join(' -> '),()=>{
  const home=fs.mkdtempSync(path.join(os.tmpdir(),'adapter-order-'));try{
  const file=path.join(home,'index.js'),lp=path.join(home,'cen-shu-life/mood-link-install.json'),ip=path.join(home,'censhu-inner-life/isolation-adapters.json');fs.mkdirSync(path.dirname(lp));fs.mkdirSync(path.dirname(ip));let source='';

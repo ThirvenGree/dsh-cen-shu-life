@@ -52,3 +52,7 @@ test('attention context exposes current event lifecycle and original timeline wi
   assert.equal(fs.readFileSync(path.join(e.dir,'state.json'),'utf8'),before);assert.throws(()=>service.attentionContext({sessionId:'foreign',eventIds:['book']}),/未绑定/);
  }finally{fs.rmSync(home,{recursive:true,force:true});}
 });
+test('browser interest reads fresh bound thoughts and excludes other sessions and expired wishes',()=>{
+ const now=Date.now();let thought='喜欢线条';const e={now:()=>now,config:{enabled:true,context:true,contentEvolutionEnabled:true,lifePlanningEnabled:true},bound:id=>id==='main',state:{active:[],mode:{id:'pleased'}},history:{events:[],mentions:[]},activeContent:()=>({intentions:[{id:'i',text:'想画门窗',priority:1,templateIds:[],validFrom:now-1,expiresAt:now+60000},{id:'old',text:'已过期',priority:1,templateIds:[],validFrom:now-100,expiresAt:now-1}]}),read:()=>({recent:[{sessionId:'main',at:now,text:'聊过窗花'},{sessionId:'other',at:now,text:'其他会话'}]}),innerLifePlanning:()=>({thoughts:[{subject:'门窗',summary:thought}],records:[{intention:'晚点画一张'}]})};
+ const shared=sharedLifeContext(e);assert.equal(shared.browserInterests({sessionId:'other'}),null);const a=shared.browserInterests({sessionId:'main'});assert.deepEqual(a.recent,['聊过窗花']);assert.equal(a.intentions.length,1);assert.deepEqual(a.privatePlans,['晚点画一张']);thought='想研究木纹';assert.equal(shared.browserInterests({sessionId:'main'}).thoughts[0].view,thought);
+});
