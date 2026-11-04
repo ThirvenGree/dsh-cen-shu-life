@@ -4,6 +4,7 @@ import {isReadOnlyTool} from '../lib/tool-semantics.js';
 
 test('shared classification recognises the supported read-only tools without mutating inputs',()=>{
  const names=['read','read_file','read_image','list_directory','grep','glob','web_search',
+  'list_context_sessions','search_context',
   'censhu_agency_context_page','censhu_agency_find_event','censhu_agency_event_history',
   'censhu_context_recall','censhu_question_recall','censhu_life_context','censhu_read_memory'];
  for(const name of names){
@@ -36,7 +37,7 @@ test('mixed-effect tools classify the actual action for object and JSON argument
 test('invalid execution data and malformed arguments never bypass action accounting',()=>{
  for(const exec of [undefined,null,false,1,'read',[],{},{name:null},{name:1}])
   assert.equal(isReadOnlyTool(exec),false);
- for(const name of ['read_file','censhu_agency_method','censhu_private_archive']){
+ for(const name of ['read_file','list_context_sessions','search_context','censhu_agency_method','censhu_private_archive']){
   for(const args of [null,false,0,[],1,'','{invalid','null','false','[]','3','"read"'])
    assert.equal(isReadOnlyTool({name,arguments:args}),false,name+' '+JSON.stringify(args));
  }
