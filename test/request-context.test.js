@@ -28,6 +28,47 @@ const pointer=text=>JSON.parse(text.split('【工具结果原文】').at(-1));
 const read=(f,args,agent=f.agent)=>JSON.parse(f.registered[1].execute(args,{agent}));
 const catalog=(f,args,agent=f.agent)=>JSON.parse(f.registered[0].execute(args,{agent}));
 
+test('tool and skill selection coexist; hidden skills remain discoverable and original loader/permissions remain',async t=>{
+ let calls=0;
+ const f=fixture(t,{plan:input=>{calls++;return {keepTools:[],keepSkills:input.skillsSelectionNeeded?['poetry']:[],results:[],reason:'按翻译任务选择'};}});
+ const entries=[{name:'poetry',description:'翻译诗句'},{name:'audio',description:'制作语音'}];
+ const skill={role:'user',source:{kind:'skill-catalog',form:'catalog',entries},content:[{type:'text',text:'<available_skills>\n'+entries.map(e=>'- `'+e.name+'`: '+e.description).join('\n')+'\n</available_skills>\n通过原 skill 工具加载全文。'}]};
+ f.request.messages=[{role:'user',content:'翻译这句诗'},skill];f.request.tools.push(definition('skill'));
+ freeze(f.request);const original=JSON.stringify(f.request);
+ const out=await f.project.transform(f.request);
+ assert.equal(calls,2);assert.equal(JSON.stringify(f.request),original);
+ assert.deepEqual(out.messages[1].source.entries,[entries[0]]);
+ assert.ok(out.tools.some(t=>t.name==='skill'));assert.ok(out.tools.some(t=>t.name==='censhu_tool_catalog'));
+ const found=catalog(f,{action:'catalog',target:'skills',query:'语音'});
+ assert.equal(found.entries[0].name,'audio');assert.deepEqual(found.entries[0].load,{tool:'skill',arguments:{name:'audio'}});
+ assert.equal(catalog(f,{action:'catalog',target:'skills'},{session:{id:'foreign'}}).available,false);
+ await f.project.transform(f.request);assert.equal(calls,2,'same-turn decisions reused');
+ f.project.recordUsage('session-fixture',{inputTokens:1234,outputTokens:40});assert.equal(f.project.status()[0].reported.inputTokens,1234);
+});
+
+test('failed skill planning preserves catalog; backoff retains the failure reason; tool choice required stays meaningful',async t=>{
+ const f=fixture(t,{plan:()=>{throw Object.assign(Error('Provider temporarily unavailable'),{httpStatus:429});}});
+ await f.project.transform(f.request);await f.project.transform(f.request);
+ assert.equal(f.project.status()[0].mode,'backoff');assert.match(f.project.status()[0].reason,/temporarily unavailable/);
+ const empty=fixture(t,{plan:()=>({keepTools:[],keepSkills:[],results:[],reason:'无需工具'})});
+ empty.request.messages=[{role:'user',content:'测试'}];empty.request.toolChoice='required';
+ assert.strictEqual((await empty.project.transform(empty.request)).tools,empty.request.tools);
+});
+
+test('life internal task is visible as context, and loaded skill instructions are never result-pruned',async t=>{
+ const f=fixture(t);
+ f.request.tools.push(definition('skill'));
+ const content='<skill_content>'+ '技能完整操作要求。'.repeat(1500)+'</skill_content>';
+ f.request.messages=[{role:'system',content:'当前生活任务：检索窗框资料。'},{role:'user',source:{kind:'user'},content:'很早以前的聊天'},
+ {role:'user',source:{kind:'plugin:dsh-censhu-agency'},content:'现在继续自己的绘画项目'},
+ {role:'assistant',content:[{type:'tool-call',id:'skill1',name:'skill',arguments:{name:'art'}}]},
+ {role:'tool',toolCallId:'skill1',content}];
+ const out=await f.project.transform(f.request);
+ assert.equal(f.input().topic,'现在继续自己的绘画项目');assert.match(f.input().taskContext.currentInstructions,/窗框/);
+ assert.match(f.input().taskContext.authorization,/not a new user permission/);
+ assert.equal(f.input().results.length,0);assert.equal(out.messages.at(-1).content,content);
+});
+
 test('frozen request becomes a clone; exact original, metadata, media, tool pairs and required definitions survive',async t=>{
  const f=fixture(t),image={type:'image',mimeType:'image/png',data:'image-bytes'},audio={type:'audio',data:'audio-bytes'};
  f.request.messages[2].content.push(image,audio);f.request.messages[2].meta={outcome:'success'};
@@ -179,7 +220,7 @@ test('archived, retired, aborted, disposed, or sessionless requests retain origi
 });
 
 test('the model protocol uses structured choices and exposes no original tool execution bridge',()=>{
- assert.deepEqual(requestPlanSchema.required,['keepTools','results','reason']);
+ assert.deepEqual(requestPlanSchema.required,['keepTools','keepSkills','results','reason']);
  const p=createRequestContext();assert.deepEqual(p.tools().map(tool=>tool.name),['censhu_tool_catalog','censhu_tool_result_read']);
  assert.equal(p.tools()[0].parameters.properties.action.enum.includes('execute'),false);p.dispose();
 });

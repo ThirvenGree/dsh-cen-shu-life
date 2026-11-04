@@ -110,3 +110,81 @@ for(const toolUpdate of [undefined,'in-history','addition-only'])test('real host
    fs.rmSync(home,{recursive:true,force:true});
  }
 });
+
+for(const lookup of ['get','list'])test('all live session scopes use task tool selection without inheriting role data or changing execution permissions ('+lookup+')',{skip:!process.env.DSH_RUNTIME_ROOT},async()=>{
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'life-request-scopes-')),oldBridge=process.env.QQ_BRIDGE_ROOT;
+ process.env.QQ_BRIDGE_ROOT=path.join(home,'empty-bridge');
+ const effects=[],nativeOffs=[];
+ const dispose=()=>effects.splice(0).reverse().forEach(off=>off());
+ try{
+  const load=name=>import(pathToFileURL(path.join(process.env.DSH_RUNTIME_ROOT,'node_modules/@deepseek-ai',name,'lib/index.js')));
+  const [{Context},{LlmRuntime,LlmAdapter,freezeMessage,markAgentLoopRequest},{LifeEngine},{createHost}]=await Promise.all([
+   load('cordis'),load('dsh-llm'),import('../lib/engine.js'),import('../lib/host.js')
+  ]);
+  const native=new Context(),runtime=new LlmRuntime(native),originalBoundary=runtime.adapterStream,received=[];
+  class Adapter extends LlmAdapter{
+   resolveModel(provider,model){return Promise.resolve({provider,id:model,name:model,context:{contextWindow:262144},toolUpdate:'in-history'});}
+   async *stream(options){received.push(options);yield {type:'finish',reason:{kind:'stop'}};}
+  }
+  nativeOffs.push(native.llm.registerAdapter(['fixture'],new Adapter()));
+  const engine=new LifeEngine({home,now:()=>1000,random:()=>1});
+  engine.saveConfig({enabled:true,context:false,sessionIds:['session-qq-bound'],semanticEnabled:false,probability:0,moodLinked:false,
+   contentEvolutionEnabled:false,weatherAutoEnabled:false,personaEvolutionEnabled:false,memoryWritebackEnabled:false,timedEventsEnabled:false});
+  fs.mkdirSync(path.join(home,'censhu-inner-life'),{recursive:true});
+  fs.writeFileSync(path.join(home,'censhu-inner-life','display-session.json'),JSON.stringify({sessionId:'session-private-life'}));
+  const roles=['desktop-default','qq-bound','private-life','child-agent'],mounts=new Map(),hooks=new Map(),services=new Map(),tools=new Map(),guards=[],executed=[];
+  const agents=roles.map(role=>({session:{id:'session-'+role,...(role==='child-agent'?{header:{parentSession:'session-desktop-default'}}:{})},ctx:{
+   systemPrompt:{context(spec){mounts.set(role,[...(mounts.get(role)||[]),spec.name]);return()=>{};}},
+   on(){return()=>{};}
+  }}));
+  const addTool=spec=>{assert.equal(tools.has(spec.name),false);tools.set(spec.name,spec);return()=>tools.delete(spec.name);};
+  const makeTool=name=>({name,description:name,parameters:{type:'object',properties:{input:{type:'string',description:'原参数保持不变。'.repeat(1000)}}},execute(args){executed.push({name,args});return 'ok';}});
+  const read=makeTool('read_report'),hidden=makeTool('unrelated_write');addTool(read);addTool(hidden);
+  guards.push(exec=>exec.name==='unrelated_write'?'scope fixture permission denied':undefined);
+  const execute=async(name,args,agent)=>{const exec={name,arguments:args,agent};for(const guard of guards){const deny=await guard(exec);if(deny)throw Error(deny);}return tools.get(name).execute(args,exec);};
+  const roots=agents.filter(agent=>!agent.session.header?.parentSession);
+  const root={llm:native.llm,agents:{roots:()=>roots,list:()=>agents,...(lookup==='get'?{get:id=>agents.find(agent=>agent.session.id===id)}:{})},workspaceRegistry:{archivedSessionIds:[]},
+   tools:{register:addTool,get:name=>tools.get(name),guard(fn){guards.push(fn);return()=>guards.splice(guards.indexOf(fn),1);}},
+   provide:(name,value)=>services.set(name,value),get:()=>undefined,webServer:{register:()=>()=>{}},interval:()=>()=>{},
+   effect(fn){const off=fn();if(typeof off==='function')effects.push(off);},
+   on(name,fn){if(!hooks.has(name))hooks.set(name,new Set());hooks.get(name).add(fn);return()=>hooks.get(name).delete(fn);}
+  };
+  let plans=0,budgetPlans=0;
+  createHost(root,{engine,director:false,requestPlanner:input=>{plans++;return {keepTools:input.toolsSelectionNeeded?['read_report']:[],keepSkills:[],results:[],reason:'This task needs only the report reader; other capabilities remain discoverable.'};},budgetPlanner:()=>{budgetPlans++;throw Error('No role data was requested by this fixture');}});
+  const shared=services.get('cenShuLifeShared');
+  const allTools=Object.freeze([...tools.values()].map(schema));
+  const dispatch=async request=>{const prepared=await root.llm.prepareCall({provider:'fixture',model:'fixture',maxTokens:2048});return drain(prepared.stream(request));};
+  for(const agent of agents){
+   const messages=Object.freeze([
+    freezeMessage({id:'request-'+agent.session.id,role:'user',source:{kind:'user'},content:[{type:'text',text:'Read this report.'}]}),
+    freezeMessage(snapshot('runtime-'+agent.session.id,[{name:'existing-permissions',text:'The original permission guard applies.'}]))
+   ]);
+   const before=structuredClone(messages),toolHistory=Object.freeze({tools:allTools,updates:Object.freeze([])});
+   const request=markAgentLoopRequest(Object.freeze({sessionId:agent.session.id,provider:'fixture',model:'fixture',maxTokens:2048,messages,tools:allTools,toolHistory}));
+   await dispatch(request);const projected=received.at(-1);
+   assert.ok(projected.tools.some(tool=>tool.name==='read_report'),agent.session.id);
+   assert.ok(!projected.tools.some(tool=>tool.name==='unrelated_write'),agent.session.id+' must dynamically reduce definitions');
+   assert.deepEqual(projected.messages,before,'selection must not inject role data into a session');
+   assert.deepEqual(messages,before,'committed history stays unchanged');
+   assert.equal(tools.get(hidden.name),hidden,'original tools remain registered');
+   const catalog=JSON.parse(await execute('censhu_tool_catalog',{action:'catalog'},agent));
+   assert.ok(catalog.entries.some(tool=>tool.name===hidden.name),'omitted capability remains discoverable');
+   assert.equal(JSON.parse(await execute('censhu_tool_catalog',{action:'load',names:[hidden.name]},agent)).available,true);
+   await dispatch(request);
+   assert.deepEqual(received.at(-1).tools.find(tool=>tool.name===hidden.name),schema(hidden),'load restores the exact original schema');
+   await assert.rejects(()=>execute(hidden.name,{input:'denied'},agent),/scope fixture permission denied/);
+  }
+  assert.equal(plans,4,'one task plan per scope; loading a capability reuses it');
+  assert.equal(budgetPlans,0,'global capability selection does not run character budgeting');
+  assert.equal(mounts.has('desktop-default'),false,'default desktop session receives no life context hook');
+  assert.equal(mounts.has('child-agent'),false,'child agent receives no life context hook');
+  assert.ok(mounts.get('qq-bound')?.includes('cen-shu-life'),'bound QQ still retains its existing life context hook');
+  assert.deepEqual(executed,[],'directory reads/loads cannot execute omitted tools or bypass guards');
+  assert.deepEqual(new Set(shared.requestContextStatus().sessions.map(row=>row.sessionId)),new Set(roles));
+  dispose();assert.equal(runtime.adapterStream,originalBoundary);
+ }finally{
+  dispose();for(const off of nativeOffs.reverse())off();
+  if(oldBridge===undefined)delete process.env.QQ_BRIDGE_ROOT;else process.env.QQ_BRIDGE_ROOT=oldBridge;
+  fs.rmSync(home,{recursive:true,force:true});
+ }
+});
