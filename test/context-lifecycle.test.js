@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {installContextLifecycle} from '../lib/context-lifecycle.js';
 
-function fixture(initial=[],callbacks={},projection){
+function fixture(initial=[],callbacks={},agents){
  const handlers=new Map(),removed=[],forgotten=[];
- const ctx={get:name=>name==='workspaceRegistry'?{archivedSessionIds:initial}:name==='sessionProjections'?projection:undefined,
+ let deprecatedReads=0;
+ const ctx={agents,get(name){if(name==='sessionProjections'){deprecatedReads++;throw Error('deprecated API');}return name==='workspaceRegistry'?{archivedSessionIds:initial}:undefined;},
   on(name,fn,options){assert.equal(options.global,true);handlers.set(name,fn);return()=>{removed.push(name);handlers.delete(name);};}};
  const lifecycle=installContextLifecycle(ctx,id=>forgotten.push(id),callbacks);
  const changed=ids=>handlers.get('domain/changed')({domain:'workspace',table:'',operation:'put',value:{archivedSessionIds:ids}});
- return {handlers,removed,forgotten,lifecycle,changed};
+ return {handlers,removed,forgotten,lifecycle,changed,get deprecatedReads(){return deprecatedReads;}};
 }
 
 test('archive singleton changes clear newly archived snapshots and retain a live archival gate',()=>{
@@ -78,16 +79,30 @@ test('turn/start precedes assembly and repeated model steps retain one turn iden
  f.lifecycle.dispose();
 });
 
-test('hot reload uses the host turnBoundary projection and never scans history',()=>{
+test('hot reload uses agents.turnBoundaryOf and never reads deprecated projections or history',()=>{
  let projection={lastTurn:4,openTurnStartSeq:22},reads=0;
  const session={id:'chat',snapshotEvents(){assert.fail('deprecated full event reads are prohibited');}};
- const f=fixture([],{}, {stateOf(actual,key){assert.equal(actual,session);assert.equal(key,'turnBoundary');reads++;return projection;}});
+ const agents={turnBoundaryOf(actual){assert.equal(this,agents);assert.equal(actual,session);reads++;return projection;}};
+ const f=fixture([],{},agents);
  assert.equal(f.lifecycle.currentTurn(session),4);assert.equal(f.lifecycle.currentTurn(session),4);assert.equal(reads,1);
  projection={lastTurn:4,openTurnStartSeq:null};f.handlers.get('session/event')(session,{type:'turn/end',data:{turn:4}});
  assert.equal(f.lifecycle.currentTurn(session),undefined);assert.equal(reads,2);
  for(const bad of [undefined,{}, {lastTurn:0,openTurnStartSeq:0},{lastTurn:4,openTurnStartSeq:null},{lastTurn:4,openTurnStartSeq:-1}]){projection=bad;assert.equal(f.lifecycle.currentTurn(session),undefined);}
  projection={lastTurn:5,openTurnStartSeq:30};assert.equal(f.lifecycle.currentTurn(session),5);
  f.lifecycle.dispose();assert.equal(f.lifecycle.currentTurn(session),undefined);
+ assert.equal(f.deprecatedReads,0);
+});
+
+test('missing or failing agents API preserves event-driven tracking without deprecated fallback',()=>{
+ for(const agents of [undefined,{}, {turnBoundaryOf(){throw Error('host unavailable');}}]){
+  const f=fixture([],{},agents),session={id:'chat'};
+  assert.equal(f.lifecycle.currentTurn(session),undefined);
+  f.handlers.get('session/event')(session,{type:'turn/start',data:{turn:2}});
+  assert.equal(f.lifecycle.currentTurn(session),2);
+  f.handlers.get('session/event')(session,{type:'turn/end',data:{turn:2}});
+  assert.equal(f.lifecycle.currentTurn(session),undefined);
+  assert.equal(f.deprecatedReads,0);f.lifecycle.dispose();
+ }
 });
 
 test('archive, disposal and teardown clear active turns without accepting late turn events',()=>{
@@ -101,7 +116,7 @@ test('archive, disposal and teardown clear active turns without accepting late t
 });
 
 test('a disposed session instance cannot resurrect a cached open projection but a resumed instance can',()=>{
- const old={id:'session-chat'},fresh={id:'session-chat'},f=fixture([],{}, {stateOf:()=>({lastTurn:7,openTurnStartSeq:50})});
+ const old={id:'session-chat'},fresh={id:'session-chat'},f=fixture([],{}, {turnBoundaryOf:()=>({lastTurn:7,openTurnStartSeq:50})});
  assert.equal(f.lifecycle.currentTurn(old),7);
  f.handlers.get('session/disposed')(old);
  assert.equal(f.lifecycle.currentTurn(old),undefined);
