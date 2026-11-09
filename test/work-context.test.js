@@ -2,6 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import {shapeWorkParts, pinQqStyle, backgroundPausedNote} from '../lib/work-context.js';
 import {roundLifeTime, planSchema, planPrompt} from '../lib/context-budget.js';
 
@@ -46,5 +48,7 @@ test('源码核对：工作做法固定、其他会话作候选、工作会话�
   assert.match(host, /if\(recoveryRuntime\.state\?\.pending\)return;/);
   assert.match(fs.readFileSync(new URL('../lib/engine.js', import.meta.url), 'utf8'), /已超过预计结束时间/);
   assert.match(fs.readFileSync(new URL('../lib/request-context.js', import.meta.url), 'utf8'), /contextOnly=new Set\(\[[^\]]*'repeat-tool-reminder'\]\)/);
-  assert.match(fs.readFileSync(new URL('../../dsh-censhu-inner-life/lib/core.js', import.meta.url), 'utf8'), /key:'inner:state'/);
+  // The inner-life plugin is a separate repository: check it only when it sits next to this one (local install), not in CI.
+  const inner = process.env.INNER_PLUGIN_ROOT ? new URL('lib/core.js', pathToFileURL(path.resolve(process.env.INNER_PLUGIN_ROOT) + path.sep)) : new URL('../../dsh-censhu-inner-life/lib/core.js', import.meta.url);
+  if (fs.existsSync(inner)) assert.match(fs.readFileSync(inner, 'utf8'), /key:'inner:state'/);
 });
