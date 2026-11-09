@@ -3,3 +3,13 @@ state/
 local/
 *.log
 .env*
+
+# Local run artifacts and backups; may contain real conversation data (2026-11-09)
+*.bak
+*.tmp
+*-tests.txt
+*-test.txt
+*result*.txt
+expression-audit-*
+qq-expression-eval.json
+event-sharing-panel.png

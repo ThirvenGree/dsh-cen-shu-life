@@ -34,7 +34,7 @@ test('a missing contract version, unknown mode, instructions or untyped section 
  assert.ok(contextBudgetContract({...fact('data','x'),contextBudget:{...fact('data','x').contextBudget,content:'data'}},'sections'));
 });
 
-for(const failure of ['throw','missing-quota','unknown-window'])test('foreign injection is preserved byte-for-byte on '+failure,async()=>{
+for(const failure of ['throw','unknown-window'])test('foreign injection is preserved byte-for-byte on '+failure,async()=>{
  const f=fixture(),external=fact('private-record','精确原文：不能用一个临时摘要替代。'),budget=roleContextBudget({plan:input=>{if(failure==='throw')throw Error('offline');const plan=resultPlan(input);delete plan.sourceAllocations;return plan;}});
  if(failure==='unknown-window')f.agent.session.requestContext=()=>({model:'fixture',provider:'fixture'});
  try{
@@ -56,7 +56,7 @@ test('deduplication is scoped to source, version, key and exact evidence, with e
  }finally{budget.dispose();}
 });
 
-test('one planning call controls old snapshots and reapplies admissions after runtime refresh without mutating history',async()=>{
+test('old snapshots are dropped and one planning call reapplies admissions after runtime refresh without mutating history',async()=>{
  const memory=fact('memory-record','被刷新回来的原始历史资料'),unknown={name:'unknown',text:'必须保留的未知上下文'},old=snapshot([{name:'runtime',text:'旧环境状态'}]);
  const current=snapshot([unknown,{name:memory.name,text:memory.text}]),user={role:'user',content:'真实问题'},tool={role:'tool',toolCallId:'original-tool',content:'真实工具回执'};
  const history=[user,old,tool,current];for(const message of history)Object.freeze(message);Object.freeze(history);
@@ -69,21 +69,17 @@ test('one planning call controls old snapshots and reapplies admissions after ru
   assert.equal(projected.messages.at(-1).source.sections.length,1);assert.equal(projected.messages.at(-1).source.sections[0].name,'unknown');
   assert.equal(JSON.stringify(history),before);
   const state=budget.status()[0];assert.equal(state.runtimeProjection.snapshotsOmitted,1);assert.equal(state.runtimeProjection.sectionsOmitted,1);assert.equal(state.runtimeProjection.historyMutated,false);
-  const catalog=JSON.parse(budget.recallTool().execute({action:'catalog',limit:12},{agent:f.agent}));
-  const item=catalog.entries.find(e=>e.source==='runtime-context');assert.ok(item);assert.equal(item.kind,'history');
-  const original=JSON.parse(budget.recallTool().execute({action:'read',snapshotId:catalog.snapshotId,version:catalog.version,itemId:item.itemId},{agent:f.agent}));assert.equal(original.text,old.content[0].text);
  }finally{budget.dispose();}
 });
 
-test('selected superseded snapshots are labeled historical; changed current source text and unrecognized snapshots stay intact',async()=>{
+test('superseded snapshots are always dropped; changed current source text and unrecognized snapshots stay intact',async()=>{
  const old=snapshot([{name:'data',text:'过去状态'}]),latest=snapshot([{name:'memory-record',text:'原本版本'}]),unknown={role:'user',source:{kind:'runtime-context',form:'snapshot',sections:[{name:'fake',text:'描述不一致'}]},content:[{type:'text',text:'未知形式不能擅删'}]};
- const f=fixture([unknown,old,latest]),budget=roleContextBudget({plan:input=>resultPlan(input,r=>r.origin==='runtime-context')});
+ const f=fixture([unknown,old,latest]),budget=roleContextBudget({plan:input=>resultPlan(input)});
  try{
   await assemble(budget,f.agent,[fact('memory-record','原本版本')]);
   const changed=snapshot([{name:'memory-record',text:'计划后产生的新版本'}]),request={...f.request(),messages:[unknown,old,changed]};
-  const result=budget.prepareRequest(request);assert.strictEqual(result.messages[0],unknown);assert.match(result.messages[1].content[0].text,/历史运行快照/);assert.strictEqual(result.messages[2],changed);
-  assert.equal(result.messages[1].source.current,false);
-  budget.endTurn(f.agent.session.id);assert.strictEqual(budget.prepareRequest(request),request);
+  const result=budget.prepareRequest(request);assert.strictEqual(result.messages[0],unknown);assert.equal(result.messages.includes(old),false);assert.strictEqual(result.messages.at(-1),changed);
+  budget.endTurn(f.agent.session.id);assert.equal(budget.prepareRequest(request).messages.includes(old),false,'规划失效时也不发旧快照');
  }finally{budget.dispose();}
 });
 

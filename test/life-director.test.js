@@ -34,3 +34,12 @@ test('event changed during review cannot be overwritten by the old behavior or p
  const d=new LifeDirector(e,{generate:async()=>value(),review:async()=>{e.add('book');return value();}});
  await d.refresh();assert.equal(e.state.active.length,1);assert.equal(d.record.proposal,undefined);assert.equal(d.record.draft,undefined);assert.equal(d.view().behavior,null);assert.match(d.record.reason,/复核期间/);
 }));
+
+test('new mood revision reconsiders behavior before the old model schedule',()=>fixture(async(e,advance)=>{
+ const dir=path.join(e.home,'feiyu-mood');fs.mkdirSync(dir);fs.writeFileSync(path.join(dir,'config.json'),JSON.stringify({slots:[{id:'censhu',sessions:['main']}]}));
+ const save=label=>fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({version:2,moods:{censhu:{mood:70,dims:{happy:0,calm:0,sweet:0,heartache:0,worry:2,sad:0,jealous:0},lastConfidence:95,updatedAt:e.now(),mixedMood:{label,components:[],expiresAt:e.now()+600000}}}}));
+ save('担心');let calls=0;
+ const d=new LifeDirector(e,{generate:async(_p,_s,input)=>{calls++;return {...value(),decision:'wait',startTemplateId:'',behavior:{...value().behavior,label:input.mood.mixedMood.label}};},review:async(_p,_s,input)=>input.candidate});
+ await d.refresh();assert.equal(calls,1);await d.refresh();assert.equal(calls,1);
+ advance(1000);save('放心了');await d.refresh();assert.equal(calls,2);assert.match(e.context('main'),/放心了/);
+}));

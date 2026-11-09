@@ -22,15 +22,25 @@ test('only matching, unconsumed, unexpired life events enter native mood judgmen
 }));
 test('accepted native judgments have bounded contribution, receipts, no duplicate apply',()=>{
  const batch=[{id:'a'}],state={timeline:[]},d={...normal(),life:{eventIds:['a'],moodDelta:99,dims:{happy:99,sweet:99,jealous:99,sad:-99},reason:'事件',confidence:95}};
- const merged=mergeLifeContribution(d,batch,state);assert.equal(merged.moodDelta,3);assert.equal(merged.dims.happy,6);assert.equal(merged.dims.sad,-6);assert.equal(merged.dims.sweet,0);assert.equal(merged.dims.jealous,0);recordLifeMoodReceipts(state,merged);assert.deepEqual(state.lifeEventReceipts,['a']);assert.equal(mergeLifeContribution(d,batch,state).moodDelta,0);
+ const merged=mergeLifeContribution(d,batch,state);assert.equal(merged.moodDelta,3);assert.equal(merged.dims.happy,6);assert.equal(merged.dims.sad,-6);assert.equal(merged.dims.sweet,6);assert.equal(merged.dims.jealous,6);recordLifeMoodReceipts(state,merged);assert.deepEqual(state.lifeEventReceipts,['a']);assert.equal(mergeLifeContribution(d,batch,state).moodDelta,0);
 });
 test('unreliable, forged and mixed stale event IDs never count as an emotion contribution',()=>{
- for(const life of [{eventIds:['forged'],confidence:90,moodDelta:3},{eventIds:['a'],confidence:30,moodDelta:3},{eventIds:['a','stale'],confidence:90,moodDelta:3}])assert.equal(mergeLifeContribution({...normal(),life},[{id:'a'}],{lifeEventReceipts:['stale']}).lifeAcceptedIds.length,0);
+ for(const life of [{eventIds:['forged'],confidence:90,moodDelta:3},{eventIds:['a'],confidence:Number.NaN,moodDelta:3},{eventIds:['a','stale'],confidence:90,moodDelta:3}])assert.equal(mergeLifeContribution({...normal(),life},[{id:'a'}],{lifeEventReceipts:['stale']}).lifeAcceptedIds.length,0);
 });
 test('a confidently neutral judgment is consumed once without manufacturing emotion',()=>{
  const state={timeline:[]},d=mergeLifeContribution({...normal(),life:{eventIds:['a'],confidence:90,moodDelta:0,dims:{},reason:'这件事很平常'}},[{id:'a'}],state);assert.equal(d.moodDelta,0);recordLifeMoodReceipts(state,d);assert.deepEqual(state.lifeEventReceipts,['a']);assert.equal(state.timeline.length,0);
 });
-test('a zero-change sampled reaction cannot be turned into a random score jump',()=>{const batch=[{id:'a',reaction:{suggestedMoodDelta:0,suggestedDims:{}}}],d=mergeLifeContribution({...normal(),life:{eventIds:['a'],confidence:90,moodDelta:3,dims:{happy:6}}},batch,{});assert.equal(d.moodDelta,0);assert.equal(d.dims.happy,0);assert.deepEqual(d.lifeAcceptedIds,['a']);});
+test('a neutral reaction suggestion does not override a grounded model judgment',()=>{const batch=[{id:'a',reaction:{suggestedMoodDelta:0,suggestedDims:{}}}],d=mergeLifeContribution({...normal(),life:{eventIds:['a'],confidence:90,moodDelta:3,dims:{happy:6}}},batch,{});assert.equal(d.moodDelta,3);assert.equal(d.dims.happy,6);assert.deepEqual(d.lifeAcceptedIds,['a']);});
 test('life plugin never writes original mood data, and judgment prompt separates its contribution',()=>fixture(home=>{
  const dir=path.join(home,'feiyu-mood');fs.mkdirSync(dir);fs.writeFileSync(path.join(dir,'state.json'),'original-marker');const e=new LifeEngine({home,now:()=>Date.parse('2026-10-27T12:00:00Z')});e.add('reading');assert.equal(fs.readFileSync(path.join(dir,'state.json'),'utf8'),'original-marker');const text=lifeMoodJudgeContext([{id:'one',stage:'读书'}]);assert.match(text,/主字段 moodDelta\/dims\/reason 只计算本轮实际对话贡献/);assert.match(text,/不额外|一次心情判断/);assert.match(text,/life:/);
 }));
+
+test('uncertain life evidence remains pending; explicit no-change is terminal',()=>{
+ for(const life of [{eventIds:['a'],confidence:Number.NaN,moodDelta:2},{eventIds:['a'],confidence:95,decision:'uncertain'},{eventIds:['a'],confidence:95,decision:'defer'},{eventIds:['forged'],confidence:95}]){
+ const state={};recordLifeMoodReceipts(state,mergeLifeContribution({...normal(),life},[{id:'a'}],state));assert.deepEqual(state.lifeEventReceipts,[]);
+ }
+ const state={};const d=mergeLifeContribution({...normal(),life:{decision:'no-change',eventIds:['a'],confidence:95,moodDelta:3,dims:{worry:5}}},[{id:'a'}],state);recordLifeMoodReceipts(state,d);assert.deepEqual(state.lifeEventReceipts,['a']);assert.equal(d.moodDelta,0);assert.equal(d.dims.worry,0);
+});
+test('a concrete worry can change the actual dimension',()=>{
+ const d=mergeLifeContribution({...normal(),life:{eventIds:['a'],confidence:95,moodDelta:-1,dims:{worry:4,heartache:2},reason:'担心借来的旧书受潮'}},[{id:'a'}],{});assert.equal(d.dims.worry,4);assert.equal(d.dims.heartache,2);
+});

@@ -14,7 +14,7 @@ function plan(input,extra,recall){
  return {reason:'本轮先回答天气，旧画是否需要回看另行决定。',order:[1],recall,
   allocations:{life:{tokens:selectedCost+extra,reason:'保留完整天气资料'},inner:{tokens:0,reason:'本轮不展开旧画'},agency:{tokens:0,reason:'没有主动任务'}}};
 }
-const hint=result=>result.sections.find(row=>row.name==='censhu-context-recall');
+const hint=result=>(result.contexts||[]).find(row=>row.name==='censhu-context-recall');
 function assertWeather(budget,result){
  const text=result.contexts.find(row=>row.name==='cen-shu-life').text;
  assert.equal(text,required+'\n'+weather,'a recall pointer must not evict model-selected weather');
@@ -27,7 +27,7 @@ function assertWeather(budget,result){
 test('an explicit empty recall selection preserves chosen weather without injecting a generic catalog',async()=>{
  const budget=roleContextBudget({plan:input=>plan(input,10,[])});
  try{
-  const result=await budget.add(base(),agent,'contexts','cen-shu-life',offered,'可按需回忆');
+  const result=await budget.add(base(),agent,'contexts','cen-shu-life',offered);
   assertWeather(budget,result);
   const status=budget.status()[0];
   assert.equal(hint(result),undefined);assert.equal(status.recall.pointerIncluded,false);
@@ -38,7 +38,7 @@ test('an explicit empty recall selection preserves chosen weather without inject
 test('when only a bare catalog fits, keep selected weather and omit the entire pointer-plus-cue package',async()=>{
  const budget=roleContextBudget({plan:input=>plan(input,input.retrieval.minimumHintTokens+5,[{id:2,when}])});
  try{
-  const result=await budget.add(base(),agent,'contexts','cen-shu-life',offered,'可按需回忆');
+  const result=await budget.add(base(),agent,'contexts','cen-shu-life',offered);
   assertWeather(budget,result);
   const status=budget.status()[0];
   assert.equal(hint(result),undefined,'do not leave a generic pointer when its chosen cue cannot fit');
@@ -51,7 +51,7 @@ test('when only a bare catalog fits, keep selected weather and omit the entire p
 test('a compact pointer is admitted only together with a funded omitted-item cue, and all overhead is counted',async()=>{
  const budget=roleContextBudget({plan:input=>plan(input,input.retrieval.minimumHintTokens+90,[{id:2,when}])});
  try{
-  const result=await budget.add(base(),agent,'contexts','cen-shu-life',offered,'可按需回忆');
+  const result=await budget.add(base(),agent,'contexts','cen-shu-life',offered);
   assertWeather(budget,result);
   const section=hint(result),status=budget.status()[0];assert.ok(section);
   assert.match(section.text,/^【按需原文】/,'use the complete model-selected recall package without generic instructions');
@@ -70,7 +70,7 @@ test('a compact pointer is admitted only together with a funded omitted-item cue
 test('a cue for already selected weather does not leave an unrelated generic reminder for an omitted diary',async()=>{
  const budget=roleContextBudget({plan:input=>plan(input,1000,[{id:1,when:'需要天气原文时再读'}])});
  try{
-  const result=await budget.add(base(),agent,'contexts','cen-shu-life',offered,'可按需回忆');
+  const result=await budget.add(base(),agent,'contexts','cen-shu-life',offered);
   assertWeather(budget,result);
   const status=budget.status()[0];assert.equal(hint(result),undefined);
   assert.equal(status.recall.cues,0);assert.equal(status.recall.pointerIncluded,false);

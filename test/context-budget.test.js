@@ -8,8 +8,8 @@ function decision(input,ids,allocations=[500,500,500]){
  return {reason:'按当前问题选择',order:ids,allocations:Object.fromEntries(['life','inner','agency'].map((k,i)=>[k,{tokens:allocations[i],reason:'本轮需要 '+k}]))};
 }
 function chain(b,a,reverse=false,life=parts){
- const g1=next=>b.assemble(a,next,assembled=>b.add(assembled,a,'contexts','cen-shu-life',life,'可回忆'));
- const g2=next=>b.assemble(a,next,assembled=>b.add(assembled,a,'sections','censhu-agency-current',[{text:'活动',owner:'agency'},{text:'重复日记',owner:'inner',key:'diary:1'}],'可展开'));
+ const g1=next=>b.assemble(a,next,assembled=>b.add(assembled,a,'contexts','cen-shu-life',life));
+ const g2=next=>b.assemble(a,next,assembled=>b.add(assembled,a,'sections','censhu-agency-current',[{text:'活动',owner:'agency'},{text:'重复日记',owner:'inner',key:'diary:1'}]));
  return reverse?g2(()=>g1(()=>base)):g1(()=>g2(()=>base));
 }
 test('one plan jointly ranks all three sources, independent of listener order, and includes a per-source explanation',async()=>{
@@ -41,11 +41,11 @@ test('outage backs off and retains representatives, then recovers; wrong route n
  const b=roleContextBudget({now:()=>t,plan:input=>{calls++;if(calls===1)throw Object.assign(Error('HTTP 402'),{httpStatus:402});return decision(input,[]);}});
  await b.add(base,agent(),'contexts','cen-shu-life',parts);await b.add(base,agent(),'contexts','cen-shu-life',parts);assert.equal(calls,1);assert.equal(b.status()[0].byOwner.inner.kept,1);assert.match(b.status()[0].reason,/402/);
  t+=300001;await b.add(base,agent(),'contexts','cen-shu-life',parts);assert.equal(b.status()[0].mode,'model');
- await b.add(base,agent(),'contexts','cen-shu-life',parts,null,null,{route:{model:'different'}});assert.equal(b.status()[0].windowSource,'unknown');assert.equal(b.status()[0].byOwner.inner.kept,0);
+ await b.add(base,agent(),'contexts','cen-shu-life',parts,null,{route:{model:'different'}});assert.equal(b.status()[0].windowSource,'unknown');assert.equal(b.status()[0].byOwner.inner.kept,0);
 });
-test('invalid planning ids fall back; public telemetry never includes source texts',async()=>{
+test('invalid planning ids are dropped and the plan still applies; public telemetry never includes source texts',async()=>{
  const b=roleContextBudget({plan:input=>decision(input,[9001])});
- await chain(b,agent());assert.match(b.status()[0].reason,/无效/);
+ await chain(b,agent());assert.equal(b.status()[0].mode,'model');
  b.observe({sessionId:'fixture',model:'model',messages:[{role:'user',source:{kind:'runtime-context',sections:[{name:'memory',text:'private text'}]},content:'private text'}]});b.recordUsage('fixture',{inputTokens:77});
  assert.equal(b.status()[0].request.reported.inputTokens,77);assert.doesNotMatch(JSON.stringify(b.status()),/private text/);assert.ok(estimateText('预算')>0);
 });
@@ -62,7 +62,7 @@ test('omitted temporary observations have exact paginated receipts and model-sel
  const observation='【临时观察】旧窗扣右侧缺一颗螺钉。'+'原文细节'.repeat(500);
  const budget=roleContextBudget({plan:input=>({...decision(input,[],[800,0,0]),recall:[{id:1,when:'比较窗扣时核对原文，不凭简短摘要补全'}]})});
  const output=await budget.add(base,a,'contexts','cen-shu-life',[parts[0],{owner:'inner',key:'observation:window',text:observation}]);
- const state=budget.status()[0],manifest=output.sections.find(s=>s.name==='censhu-context-recall');
+ const state=budget.status()[0],manifest=output.contexts.find(s=>s.name==='censhu-context-recall');assert.equal((output.sections||[]).some(s=>s.name==='censhu-context-recall'),false,'目录不进系统提示');
  assert.equal(state.recall.available,true);assert.equal(state.recall.cues,1);assert.match(manifest.text,/比较窗扣时核对原文/);
  assert.doesNotMatch(JSON.stringify(output),/右侧缺一颗螺钉/);
  const tool=budget.recallTool(),run=args=>JSON.parse(tool.execute(args,{agent:a}));
@@ -80,7 +80,7 @@ test('pressure still records an exact snapshot without injecting an unfunded poi
  let plans=0;const budget=roleContextBudget({plan:()=>{plans++;throw Error('not needed');}});
  const result=await budget.add(base,a,'contexts','cen-shu-life',parts);
  assert.equal(plans,0);assert.equal(budget.status()[0].pressure.state,'awaiting-compaction');
- assert.equal(result.sections.some(s=>s.name==='censhu-context-recall'),false);
+ assert.equal((result.contexts||[]).some(s=>s.name==='censhu-context-recall'),false);
  const catalog=JSON.parse(budget.recallTool().execute({action:'catalog'},{agent:a}));
  assert.equal(catalog.status,'ready');assert.equal(catalog.entries.length,parts.length);
  budget.observe({sessionId:a.session.id,model:'model',messages:[{role:'user',content:'压缩后的历史'}],tools:[]});

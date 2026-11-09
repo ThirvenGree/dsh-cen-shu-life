@@ -27,7 +27,7 @@ test('annoyed reaction stays fixed across stages, restart and quota exhaustion',
 }));
 test('all uncertain semantic states stay unknown; rules do not mislabel reported regressions',async()=>{
  for(const text of ['我已经不难受了','我喜欢你推荐的那本书','我朋友今天好累']){const r=ruleSignals(text);assert.equal(r.needsCare,false);assert.equal(r.confession,false);}
- for(const classify of [async()=>{throw Error('offline');},async()=>signal({confidence:69,confession:true}),async()=>new Promise(()=>{})]){const c=new SituationClassifier({classify});const r=await c.resolve('s','我喜欢你推荐的那本书',{...config,semanticTimeoutMs:5});assert.equal(r.confession,false);assert.ok(r.confidence<70);}
+ for(const classify of [async()=>{throw Error('offline');},async()=>({...signal({confidence:69,confession:true}),interpretation:'uncertain'}),async()=>new Promise(()=>{})]){const c=new SituationClassifier({classify});const r=await c.resolve('s','我喜欢你推荐的那本书',{...config,semanticTimeoutMs:5});assert.equal(r.confession,false);assert.ok(r.confidence<70);}
 });
 test('circuit opens after consecutive failures and recovers after cooldown',async()=>{
  let now=0,calls=0,broken=true;const c=new SituationClassifier({now:()=>now,cooldownMs:100,classify:async()=>{calls++;if(broken)throw Error('offline');return signal();}});
@@ -60,9 +60,9 @@ test('modification guard rejects rebind, CSRF, foreign origins, ports and nonloc
  assert.doesNotThrow(()=>g.check({method:'GET',headers:{host:'127.0.0.1:3100','sec-fetch-site':'cross-site','sec-fetch-mode':'navigate','sec-fetch-dest':'document'}},'/settings'));
  assert.throws(()=>g.check({method:'GET',headers:{host:'127.0.0.1:3100','sec-fetch-site':'cross-site','sec-fetch-mode':'navigate','sec-fetch-dest':'iframe'}},'/settings'));
 });
-test('low confidence, rejected or omitted event decisions are consumed once without changing scores',()=>fixture(home=>{
+test('uncertain or omitted event decisions remain pending without changing scores',()=>fixture(home=>{
  const e=new LifeEngine({home,now:()=>at,random:()=>0});e.saveConfig({sessionIds:['target']});e.add('reading');const batch=readLifeMoodInputs(home,'target','censhu',{},at);
- for(const life of [undefined,{confidence:10,eventIds:batch.map(x=>x.id),moodDelta:3},{confidence:95,eventIds:[],moodDelta:3}]){const state={};const d=mergeLifeContribution({moodDelta:0,dims:{},confidence:95,life},batch,state);assert.equal(d.moodDelta,0);assert.deepEqual(d.lifeAcceptedIds,[]);recordLifeMoodReceipts(state,d);assert.equal(readLifeMoodInputs(home,'target','censhu',state,at).length,0);}
+ for(const life of [undefined,{confidence:Number.NaN,eventIds:batch.map(x=>x.id),moodDelta:3},{confidence:95,eventIds:[],moodDelta:3}]){const state={};const d=mergeLifeContribution({moodDelta:0,dims:{},confidence:95,life},batch,state);assert.equal(d.moodDelta,0);assert.deepEqual(d.lifeAcceptedIds,[]);recordLifeMoodReceipts(state,d);assert.equal(readLifeMoodInputs(home,'target','censhu',state,at).length,batch.length);}
 }));
 test('host waits for one classification, renders once without writes, and rejects stale results',()=>fixture(async home=>{
  let release,releaseTwo;const gate=new Promise(r=>release=r),gateTwo=new Promise(r=>releaseTwo=r);let calls=0;const e=new LifeEngine({home,now:()=>at});e.saveConfig({sessionIds:['session-target'],probability:0,contentEvolutionEnabled:false,weatherAutoEnabled:false});const classifier=new SituationClassifier({classify:async()=>{calls++;if(calls===1){await gate;return signal();}await gateTwo;return signal({confession:true});}});

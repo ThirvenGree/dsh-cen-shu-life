@@ -4,7 +4,7 @@ import {roleContextBudget} from '../lib/context-budget.js';
 
 const actor=id=>({session:{id,requestContext:()=>({model:'fixture',contextWindow:24000})}});
 const plan=input=>({reason:'当前资料',allocations:Object.fromEntries(['life','inner','agency'].map(k=>[k,{tokens:1000,reason:'当前资料'}])),order:input.candidates.filter(r=>!r.required).map(r=>r.id)});
-const collect=(budget,agent,assembly)=>budget.add(assembly,agent,'contexts','cen-shu-life',[{text:'本轮精确原文',required:true},{text:'可选资料'}],'');
+const collect=(budget,agent,assembly)=>budget.add(assembly,agent,'contexts','cen-shu-life',[{text:'本轮精确原文',required:true},{text:'可选资料'}]);
 const build=(budget,agent,next=async()=>({contexts:[],sections:[]}))=>budget.assemble(agent,next,assembly=>collect(budget,agent,assembly));
 const recall=(budget,agent,args={action:'catalog'})=>JSON.parse(budget.recallTool().execute(args,{agent}));
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};

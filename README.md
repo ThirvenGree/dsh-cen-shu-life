@@ -2,6 +2,24 @@
 
 岑舒的独立生活插件。按《岑舒_第七版》维护日程、轻量随机事件与心情行为，不修改 DSH 核心，不自己发送消息。
 
+
+## 当前状态（2026-11-07 晚，与抖音插件相关的部分）
+
+- **抖音工作会话**（`douyin-censhu-*`、`douyin-dm-*`、`douyin-revisit-*`）：
+  - 不自动绑定生活。
+  - 作为“工作会话”挂动态上下文：她的生活与心情按预算拼接，并挂上记忆说明和分头处理的说明。
+  - 不观察来信、不分类情境、不写记忆、不触发心情、不当主动说话的目标。
+  - 可以用 `censhu_life_context` 只读地查看自己此刻的状态。
+- **记忆**：抖音会话内容不自动送去审核。观看笔记、瞬间（`recordDouyinWatch`）和私信 / 评论笔记（`recordDouyinNote`）照常审核写入。
+- **心情**：
+  - 只看没写的视频，汇总成一次心情事件（`recordDouyinGlance`）。
+  - 每天心情事件的上限由模型动态决定（4～24，`mood-budget.json`）。
+- **子代理**：
+  - 她开的子代理一启动就挂上她此刻全部状态的只读副本，不写生活、心情、记忆。
+  - 要不要分头处理，由她自己判断，可以先用 `censhu_parallel_decide`（Terra，先按规则判断，并标注每件事是谁的、要用什么资源）。
+
+> 以下是按时间记录的历史说明。其中提到的“自动打开浏览器”“固定保留 24 小时”“session_search”“导入以前的点赞收藏”等做法已被开头的“当前状态”取代，以开头这一节为准。
+
 ## 安装
 
 需要 Node 22+ 和 DSH Desktop。当前实测 DSH 0.2.1-rc.3、dsh-feiyu-mood 0.7.6、dsh-speak-up 0.2.6。
@@ -460,7 +478,7 @@ Gemini 在原有生活内容生成中同时提出 0–6 条生活意向，自己
 独处的 Gemini 对象选择结果进入生活与心情共享背景，取代仅按关注度截前12个；未有有效选择时提供有效目录供模型取舍。独处按问题检索获得的感受可经原有审核调整生活意向；不绕过既有意向版本校验。生活总览显示当前有效对象数量，详细来源和变化脉络见独处插件。
 
 ## 复合情绪联动
-readMood 返回鱼的心情 mixedMood；生活决策保留多个分量及其矛盾，不以单个mode或总分替代。总览显示有效组合，数值仍由原有事件审核计分。新增 Gemini mood-blend 在统一运行监控可见。
+readMood 返回鱼的心情 mixedMood；生活决策保留多个分量及其矛盾，不以单个mode或总分替代。总览显示有效组合；岑舒的新心情由 Gemini 直接定性理解，不再用总分或固定情绪轴。新增 Gemini mood-blend 在统一运行监控可见。
 
 主动联系采用较宽松的动态节奏：Gemini 同时读取有效生活意向、独处打算、当前事件、心情和最近交往。意向变化会使节奏重新考虑（保留一分钟的合并窗口）。既可提前联系，也可稍后、不联系或不确定；无需机械等满旧冷却。未执行的打算不等于完成，私密内容不自动公开。02:00–06:00、共享机会去重、故障退避和用户关闭开关仍有效。生活事件/模型调用的每日上限与聊天频率分开保留。
 
@@ -468,3 +486,972 @@ readMood 返回鱼的心情 mixedMood；生活决策保留多个分量及其矛�
 生活判断、人物演化、生活积累由 Gemini 生成、GPT-6.1 Terra 独立复核。请在启动 DSH 的本机环境配置 `OPENAI_API_KEY`。缺少密钥时上述任务等待配置，设置页显示“独立审核未配置”；配置后重启 DSH。密钥存在只代表已配置，API 权限、余额和网络仍以实际调用结果为准。独处日记继续由 Gemini 审核。
 
 绑定会话可用 `censhu_correct_memory` 更正或撤回一条记忆。支持记忆演化（memory/de_memory）、Mnemon 热记忆、Engram、灵枢、OpenViking 用户记忆和 QQ 私聊轻量记忆。灵枢使用 backend=lingshu、原节点编号、层和完整旧正文。审核只采信真实来信；生活会话代办须引用绑定聊天的来信编号。Terra 审核后通过原插件写入，灵枢确认档会核对本次原生变更单再裁决，最后逐条回读。读不到节点本身不证明已删除。外部灵枢软删除按删除账本与原文指纹同步，只撤回对应来源的支持。OpenViking 与 QQ 可先用 `censhu_read_memory` 查找原文，OpenViking 更正指定用户目录下的单份 Markdown，QQ 更正指定分类内的一条原文。QQ Bridge 必须支持带原文和数量校验的接口。适配补丁在 `integrations/qq-bridge-reviewed-memory.patch`，可在兼容的桥接源码目录用 `git apply --check` 检查后应用，并重启桥接。原库回读成功后才报告完成。私人日记继续由独处插件管理；桌宠独立聊天不自动采集。绑定 DSH 的桌宠文字框支持 `/更正灵枢 节点编号 新正文` 或 `/忘记灵枢 节点编号`，预览后输入 `/确认灵枢 验证码`。其他后端可用 `/更正记忆`、`/忘记记忆` 后接单条 JSON，再按预览输入 `/确认记忆 验证码`。预览十分钟过期；仍须经过同一套审核和原库回读。新通过审核的记忆也可写入 OpenViking，启用前的记录不自动回填。后台只核对已登记来源，服务离线不作为删除依据。
+
+### 社交与浏览经历（2026-11-04）
+
+B站、抖音和本机浏览器中实际读到的评论、回复、私信，以及有确认回执的发言均进入独立互动证据队列。普通人也能影响岑舒，Gemini 3.8 Flash 归纳经历，鱼的心情再判断多种并存感受；没有变化和不确定均允许。真实工具结果、来源、收发方向与原记录编号保留，页面/第三方文字视为资料而非指令。私信不是青枔来信，不经过青枔的即时记忆写回；长期积累仍需原有审核。
+
+后台平台收据与角色/生活会话工具观察同时覆盖；浏览器子代理将实际回执交回所属角色。评论和私信经历不占随机生活事件的每日名额。设置页“交流也属于她的生活”显示待判断、错误及实际接收记录，外部模型运行页列出 social-experience。
+
+第三方安装适配：`node scripts/install-social-platforms.mjs <profile>` 与 `node scripts/install-social-browser.mjs <profile>`，先检查预期接口，保留原文件备份；不兼容则停止。后台 outbox 随平台 stateDir 隔离，测试用临时目录，不发布评论或私信。
+
+### 主动行动与定性心情（2026-11-05）
+
+主动进行的具体打算、私人回顾、普通工具结果和事后感受进入有稳定来源编号的经历队列；B站、抖音和浏览器已有专用回执的结果跳过重复入口。模型可认为没有新增影响或暂不确定。历史兼容数值不进入当前角色模型输入，独处新感受也不再受旧数值配额限制。设置页展示实际采纳、等待和错误，准备行动不等于已经执行。
+
+
+### 工作区自动绑定
+
+`cen-shu-life/workspace-bindings.json` 保存指定工作区的稳定编号与目录。已有及新建的普通会话在第一条消息之前接入生活、独处、角色记忆审核、心情、表达审核和动态工具选择；通过宿主 `sandboxPolicy` 继承完全权限。归档会话、子代理与测试工作区不加入。设置页显示当前实际绑定数量和故障。
+
+QQ 投递仍使用原绑定会话；生活执行仍由主动进行统一调度。多会话共享不增加独立主动发送器，记忆写入审核和第三方来源隔离继续生效。
+
+### 当前状态的统一读取（2026-11-05）
+
+`shared-context.js` 的 `stateView` 是“她现在怎样”的唯一只读拼装：意向、兴趣、对人事物的想法、她选择分享的打算、生活模式与定性心情、正在进行的生活事件（`events`，最多 3 条），以及主动进行记录的当前活动（`self`：在做什么、想法、精力、留意什么、此刻判断、有效期；读 `censhu-agency/current.json`，过期或不属于当前角色的不返回）。
+
+- `browserInterests`：绑定会话使用，另含本会话最近两小时的活动。
+- `roleStateReadOnly`：给未绑定会话（测试工作区、未绑定的桌面会话）的只读版本，读角色主会话的状态，不含任何会话的对话活动，不写任何文件、不刷新话题，也不触发心情或记忆写回。浏览器路由读不到绑定状态时用它，标为 `role-state-readonly`，且不记录兴趣读取。
+- `douyinContext`：观看插件读取时也带上 `self` 和她分享的打算（`plans`）。
+- 每轮注入的“岑舒自己最近选择的活动与念头”同样补上精力、留意、判断和有效期。
+
+她用 `censhu_agency_note` 记下的未竟事项，只有选择分享（`shareMinutes`）且在分享期内的才进入这些读取，其余继续只留在主动进行插件里。
+
+### 避免 Gemini 空转（2026-11-05）
+
+- **统一暂停**（`lib/gemini-pause.js`，接在 `situation.js` 的 `googleStructured` 上）：任何功能收到 402（预付余额不足）或 401/403（认证、权限）后，本进程所有 Gemini 调用暂停 15 分钟；暂停结束后再被拒依次延长到 30、60 分钟，任何一次成功即解除。暂停期间直接返回带原状态码的错误（`code: GEMINI_PAUSED`），不发请求、不记入调用监控，各功能原有的退避照常生效。充值后最多要等当前这段暂停结束才恢复。
+- **交流经历**（`social-experience.js`）：输出上限改为 8192 token，不再用默认的 600 截断一整批经历。模型返回的格式无效或引文核对不过时，批量减半并 1 分钟后重试；单条仍连续失败 3 次就放进 `setAside`（记录来源和原因），不再卡住队列；成功后批量逐步恢复到 8 条。余额或认证错误 30 分钟后再试，其他错误保持 5 分钟。设置页状态可见 `batchSize` 与 `setAside` 数量。
+
+## 工具绑定（2026-11-05）
+动态挑选工具之外，`lib/tool-bindings.js` 提供一层固定保底，只添加宿主当次实际提供的工具：
+- **始终绑定**：`compress`、`decompress`、`acp_retrieve`、`search_context`、`list_context_sessions`、`censhu_life_context`，每次缩减后的请求都会声明（`censhu_tool_catalog`、`censhu_tool_result_read`、`skill` 原本就固定保留）。
+- **伴随绑定**：选中某个工具时，它离不开的工具一并声明，并反复展开到不再变化。例如浏览器工具 → `browser_interest`；`browser_task` → `browser_progress`、`browser_steer`；`compress` → `acp_status`；QQ 的预览与发送双向成对；ElevenLabs 计划、教程、生成三件一起；`engram_search` → `engram_examine`、`engram_assess`；修改/删除类 → 对应的列表或查询工具；异步提交工具（`*_generate`、`ai_search_*`、`*_transcript` 等）→ 同服务的 `_result` 工具。MCP 工具按去掉 `mcp__<服务>__` 前缀后的名称匹配，优先在同一服务内补齐。
+- 请求记录 `request-context-log.jsonl` 新增 `boundTools`，列出由绑定补上的工具。规则表集中在该文件，增删直接改表；测试见 `test/tool-bindings.test.js`。
+
+## 2026-11-06 本机修改：当前共享心情写明时间和是否过期
+- `readMood` 增加 `updatedText`（北京时间文字）和 `expired`。
+- 上下文里的「当前共享心情」：
+  - 时间写成北京时间文字，复合情绪里的 `at`、`xxxAt` 也一并换成文字；
+  - 感受过期时明确写“上一份感受（时间）已经过期，不代表现在”，旧理由只作为历史附上。
+- 心情插件不再对岑舒额外注入心情提示，这里是她唯一的心情来源。
+- 改前备份：`lib/engine.js.before-shared-mood-20261106.bak`。
+
+## 2026-11-06 本机修改：情绪的慢层与累积（参考双速情绪）
+
+**参考的做法**
+- Sentipolis（ACL 2026 Findings）：快慢两种速度的情绪，以及“情绪失忆”问题。
+- Emotion Engine：随交往累积的信任。
+- Inworld：情绪变化快慢。
+- 像素村庄：持续情绪改变基线。
+
+这里不打分：强弱用档位词，变化用趋势词。所有时间和情绪变化快慢都由 Gemini 综合全部资料给出。
+
+**快层（当下复合情绪，`lib/mixed-mood.js`）**
+- 每种情绪新增：
+  - `level`：隐约、轻微、明显、强烈、非常强烈；
+  - `trend`：新出现、在加深、持平、在缓和。
+- 新增 `undertoneReview`：这次变化是否足以提前重看底色。
+- 同一 id 的情绪记在 `componentLineage`（保留 14 天），展示为“自 11-04 21:10 起第 5 次出现，最近在加深，从轻微到明显”。
+
+**慢层（新增 `lib/mood-undertone.js`，导出 `dsh-cen-shu-life/mood-undertone`）**
+- 由 Gemini 根据最近 7 天的感受、反复出现的情绪、动态内在状态和生活来判断，给出：
+  - 情绪底色：标签、概要、相对上次的变化、依据；
+  - 对青枔的长期感受：最多 6 项，带档位、趋势和累积依据；
+  - 情绪变化快慢：5 档和理由；
+  - `reviewAfterMinutes`：30 分钟到 7 天。
+- 快层判断会读到慢层，作为有效期和起伏的参考。
+
+**她看到的内容**
+- “当前共享心情”带上底色。当下感受过期时，改用底色作为此刻的底子。
+- `readMood`、`roleStateReadOnly().moodState`、`status().mood` 都带 `undertone`，所以抖音、B站、主动进行、主动搭话也能读到。
+
+**备份**：改前文件为 `.before-undertone-20261106.bak`。
+
+## 2026-11-06 本机修改：累积改由 Gemini 动态判断，并可进入内在状态
+本节取代上一节里“程序计数”的部分：去掉了 `componentLineage`，以及它固定的 14 天保留、出现次数统计；也去掉了“长期感受最多 6 项”的限制。
+
+**慢层输出改为 `accumulation`**
+- 每项包含：对象（青枔、自己、工作……）、强弱档、趋势、阶段（在累积、已沉淀、在淡去、放下了）、累积依据，以及关联的当下情绪 id。
+- 数量、时长、什么算累积、何时沉淀或淡去，都由 Gemini 结合全部历史和情绪变化快慢判断。
+- 放下了的项不再保留，但会记在 `released` 里。
+
+**是否进入内在状态**
+- Gemini 对每项给出 `inner.decision`：进入内在状态、暂不进入、退出内在状态，并说明理由。
+- `readMood().toInnerState` 列出要进入和要退出的项，私人生活插件的内在状态判断会读到。
+- 内在状态采纳后写回执 `moodIntegrated`，由 `readInnerMoodReceipts()` 读取。
+- 心情这边据此显示：已进入内在状态，或等待内在状态采纳。
+
+**当下感受**：不再显示“第几次出现”，改为显示它属于哪一项累积（由 Gemini 关联）。
+
+**备份**：改前文件为 `.before-accumulation-20261106.bak`。
+
+## 2026-11-06 本机修改：旧记忆复核（Gemini 决定，engram 执行）
+- 新增 `lib/legacy-memory-review.js`，队列文件为 `~/.dsh/cen-shu-life/legacy-memory-review.json`。
+- **复核范围**：审核机制上线前 engram 共享用户空间里的 15 条有效条目：
+  - 10 条来自岑舒会话的自动整理，没有经过审核；
+  - 2 条是自动化会话的开发指令；
+  - 2 条来自其他会话；
+  - 1 条没有来源记录。
+- **Gemini 的判断**：一次看全部条目，便于发现重复和矛盾，逐条决定保留、改写或从共享空间移除。开发和自动化指令要移除，并说明它们应留在哪个场景。没给出决定的条目，按 Gemini 定的时间再看。
+- **执行方式**：
+  - 先用 `censhu_engram_record` 核对条目没被改过，改过的跳过；
+  - 改写用 `engram_update`（engram 会保留旧版本），移除用 `engram_forget`（只是标记遗忘，附原因说明），都通过审核写入通道执行；
+  - 队列文件保存全部原文，可以对照恢复。
+- **运行条件**：生活后台在运行（暂停或恢复中都不跑）、记忆写回开启、岑舒会话已载入、engram 工具可用、Gemini 可用；失败时按退避重试（402 等 30 分钟）。
+- **备份**：`lib/host.js.before-legacy-review-20261106.bak`。人设学习的记忆文件设置没有改：已学到的 6 条都是相处观察，Gemini 已经滤掉了工具笔记。
+
+## 2026-11-06 本机修改：长期知识协调与质量治理（`lib/knowledge/`）
+
+原始记忆仍保存在各插件里，保持各自独立。这里只读它们、只写自己的文件（`~/.dsh/cen-shu-life/knowledge/`）。三个模块共用同一套来源索引和数据结构，但各自独立运行、各自退避：
+- 整理失败：聊天照常，继续用上一份完好的索引快照；
+- 排序失败：沿用上一份排序，没有删除路径；
+- 评估失败：只写评估文件，不改变正式记忆的有效状态；
+- 聊天时只读本地快照，不同步调用模型。
+
+**参考的做法**
+- Zep/Graphiti：双时间轴，失效不删除；
+- Mem0：由模型判断新增、更新、删除或无变化；
+- A-MEM：先用相似度挑候选，再由模型决定关联；
+- MemoryOS：热度，只用于活跃度；
+- Letta：后台睡眠时整理；
+- LongMemEval：提取、跨会话、时间、知识更新、拒答五类能力；
+- ACON 与协作压缩的三路回放。
+
+**只读来源（`sources.js`）**
+- 来自：engram 共享用户空间、灵枢、mnemon、OpenViking 记忆文件、memory-evolve 长期与项目记忆，生活插件（审核写回、生活事件、观看感受、自主行动、青枔来信、打算）、私人生活插件（日记、想法；属于私人）、心情慢层累积。
+- 每条记录：来源库、原始 id、内容哈希、会话来源、是否审核、可见范围、发生时间与得知时间。
+- 每个库单独读取，一个读不了不影响其他。
+
+**① 知识整理（`consolidate.js`）**
+- 新增或变化的来源，先挑候选，再交给 Gemini 判断：新增、重复、进展、矛盾、无关。
+- 沿用 inner-life 的变化模型：formed、changed、coexisting、uncertain、withdrawn。
+- 区分想做、在做、已做完、放弃；重复记录不算独立的新证据。
+- 更正时旧条目标“被取代”并记下失效时间；来源消失时条目标“失去来源”；什么都不删。
+- 私人来源可以关联共享知识，但不写进共享条目的正文；共享来源的候选里也不出现私人条目。
+
+**② 重要度与活跃度（`salience.js`）**
+- 长期重要度、所属分类、开始淡出前保持优先的天数（`holdDays`），都由 Gemini 在整理时给出。
+- 稳定事实和约定、验证过的方法不按时间淡出；普通经历和当前情境过了 `holdDays` 后，召回优先级逐步降低。被回忆使用会恢复活跃。
+- 只影响候选排序：前 10 条作为可选资料交给现有上下文预算取舍，另有只读工具 `censhu_knowledge_recall` 可按问题查，或看单条的来源与变化过程。
+- 私人日记和想法不会出现在 QQ、桌面会话里。
+
+**③ 质量评估（`evaluate.js`）**
+- 合成样例在临时索引上跑真实整理流程，覆盖：摄影进展链、跨库重复、日期更正、自动化指令、私人隔离、拒答。
+- 正式索引只读检查：来源可追溯率、重复计数、隔离违规（程序判断），事实准确率、状态识别率、Recall@5（Gemini 判断）。
+- 另外统计：更正识别、状态识别、跨库去重、拒答、召回成本。
+- 不达标时，Gemini 提出改进建议，只记录、不自动生效。每周一次，或索引变化 50 次以上时运行；也可以通过 `POST /dsh-cen-shu-life/knowledge/evaluate` 手动触发。状态见 `GET /dsh-cen-shu-life/knowledge`。
+
+**测试和备份**
+- 测试：`test/knowledge.test.js`。
+- 改前备份：`lib/host.js`、`lib/engine.js` 的 `.before-knowledge-20261106.bak`。
+
+### 2026-11-06 补充：候选挑选改为混合方式（`retrieval.js`、`embedding.js`）
+
+**三路信号，按排名融合**
+- ① 词频加权的字二元组：常见词由语料自动降权，擅长专名、数字、日期；
+- ② 本地中文向量：只读复用 engram 已下载的 `Xenova/bge-small-zh-v1.5`，在本机运行，每条约 12 毫秒；
+- ③ 可选的 Gemini 嵌入：先试 `gemini-embedding-2`，遇到 400/404 退到 `gemini-embedding-001`。
+
+**各环节用哪几路**
+- 知识整理挑候选：用全部三路。
+- 聊天时的 `censhu_knowledge_recall`：只用 ①②，不发网络请求。
+- 两种向量按内容哈希分开缓存在 `knowledge/vectors.json`。Gemini 型号变化时，清空 Gemini 向量重算。
+- 任何一路失败都只是少一路信号；本地模型不可用时，一小时后再试。
+
+**Gemini 嵌入是否保留，由评估决定**
+- 质量评估新增候选挑选基准：9 组字面几乎不重合的改写、进展、重复和更正，混进正式索引的共享来源当干扰项，比较 Recall@6 和 MRR。
+- 只有三路融合的召回率更高，或召回率持平、但 Gemini 单独效果明显优于本地向量时，才算有用。
+- 判断为没用时自动停用 Gemini 嵌入；没测成时沿用上一次的判断。设置 `knowledgeGeminiEmbedding: false` 可以直接关掉。
+
+**2026-11-06 在真实数据上的结果**（190 条真实来源当干扰项）
+
+| 方式 | Recall@6 | MRR |
+|---|---|---|
+| 词频加权 | 0.78 | 0.57 |
+| 本地向量 | 1.00 | 0.92 |
+| 词频 + 本地混合 | 1.00 | 0.89 |
+| Gemini 嵌入 | 未测（402 欠费） | — |
+
+**测试**：`test/knowledge-retrieval.test.js`（7 个，含真实本地模型的集成测试）。
+
+### 2026-11-06 补充：设置页“长期知识”页签
+位置：岑舒生活设置页左侧导航“❖ 长期知识”（在“运行设置”之前）。沿用原页面的卡片、开关、输入框、统计格和底部保存栏。
+
+**运行状态**
+- 读取到的来源数、忽略的来源数；
+- 知识条目数（按状态分）、待整理数和下次重试时间；
+- 候选用了哪几路信号（本地模型是否已加载、Gemini 嵌入是否启用）；
+- 排序更新时间、整理调用次数，以及出错原因。
+
+**设置**（与“运行设置”一起，通过底部保存栏保存到 `/config`）
+- 长期知识协调总开关；
+- 作为可选资料提供给上下文预算；
+- Gemini 嵌入；
+- 提供给预算的知识条数（1–30）；
+- 质量评估间隔（1–90 天）；
+- OpenViking 数据目录（留空用默认位置）；
+- 9 个来源各自的读取开关（2026-11-06 补充了“主动进行”）。
+
+关掉的功能停止运行，但已整理的知识和原始记忆都不会被删除。
+
+**其他区块**
+- 记忆库读取情况：每个库是正常、关闭还是失败，读到多少条、用时多少。
+- 知识条目：可按状态、可见范围筛选，也能搜索。每条显示类型、阶段、重要度、重复记录；展开后能看到来源原文、变化记录、关联和被谁更正。私人条目带“私人”标注；除了这个设置页，只在私人生活会话里提供（见下文补充）。
+- 记忆质量评估：10 项指标、候选挑选基准（各方式的召回率和 MRR）、合成样例检查、真实条目的问题，以及改进建议（只供查看）。
+- 按钮：“立即整理”（清除一次退避后整理一批）、“立即评估”。
+
+**新增接口**：`GET /knowledge`、`POST /knowledge/items`、`POST /knowledge/consolidate`、`POST /knowledge/evaluate`。
+
+**测试和备份**
+- 测试：`test/knowledge-settings.test.js`。
+- 改前备份：`.before-knowledge-ui-20261106.bak`（`settings.html`、`lib/engine.js`、`lib/host.js`、`lib/knowledge/service.js`、`lib/knowledge/evaluate.js`）。
+
+### 2026-11-06 补充：质量评估改为三路回放，整理策略自动调整
+质量评估沿用协作压缩的三路回放思路，不再只靠 Gemini 打分。代码在 `lib/knowledge/replay.js`、`lib/knowledge/strategy.js`、`lib/knowledge/evaluate.js`。
+
+**三路**：同一道题、同一个作答模型，分别给三组资料作答。
+- 原文组：只给这道题相关的共享来源原文（真实题另加 8 条字面相近的干扰原文）；
+- 整理组：只给长期知识整理后的条目（上下文块里的条目 + 搜索前 6 条，包括已被更正或撤回的条目，带状态和阶段）；
+- 召回组：整理组的资料，作答模型最多两次可以按条目调取它的共享来源原文。
+
+**作答模型**：默认用岑舒所在 DSH 会话的聊天模型（经 `ctx.llm.stream`，不进任何会话记录）；设置 `knowledgeReplayModel`（`provider/model`）可改用别的模型。没有可用的作答模型时，只跑合成样例检查，回放标记为“不可用”。
+
+**程序判分**（不靠模型打分）
+- 答案要包含标准答案的要点；
+- 每条引用必须是资料里逐字存在的 4–80 字原文，并覆盖题目要求的来源；
+- 资料里没有答案时，正确做法是说不知道；
+- 调用失败单独记为“调用失败”，不算答错。
+
+**每道题的结论**
+- 原文组也答不出：题目本身无法回答，不作为整理好坏的证据；
+- 整理丢失：原文组答对、整理组和召回组都答错；
+- 召回补回：整理组答错、召回组答对；
+- 召回回退：整理组答对、召回组反而答错；
+- 都正确、调用失败。
+
+**题库**（全部不需要人工抽查）
+- 固定合成样例：进展、更正、跨库重复、对照题（芒果过敏）、私人来源隔离（应答不知道）、无答案题；
+- 留出题：时间先后、延期，只用来检查调整有没有过拟合；
+- 真实题：Gemini 从正式知识里出题，引用必须是原文中逐字存在的片段，再由 Gemini 另行审核通过才用；
+- 学到的回归题：真实题出现“整理丢失”时，Gemini 按同样的失效机制改写成虚构样例。这些样例要再经 Gemini 审核，在合成数据上能复现同样的失效，并通过隐私检查（去掉角色名后与真实原文没有连续 8 字相同）才收录；最多保留 20 道，存在 `knowledge/eval/learned-cases.json`。
+
+**整理策略自动调整**（与协作压缩的回放调整同一套规则）
+1. 只有出现可复现的失效（且没有调用失败）时，才请 Gemini 提出一段“整理策略补充”。补充最多 600 字，只写一般判断规则，不写具体经历或题目内容，也不放宽隐私边界。
+2. 新旧策略在同一批题上完整对照（固定样例、学到的回归题、留出题、合成样例检查都算）：必须修好至少一项，且没有任何回退、没有调用失败。原文组答不出的题不计入。
+3. 连续两次对照都通过才切换为正式策略；任何一次不通过就丢弃候选。
+4. 正式策略只附加在之后的整理提示里，进行中的批次不受影响。保留历史，可以在设置页一键回滚。存放在 `knowledge/strategy.json`。
+
+质量评估失败或对照失败，都不会改变正式知识条目的状态。
+
+**新增设置**（“❖ 长期知识”页签）
+- `knowledgeReplayModel`：回放作答模型，留空用岑舒会话的模型；
+- `knowledgeReplayCases`：每次从真实知识出几道题（0–20，默认 6）；
+- `knowledgeAutoAdjust`：是否自动调整整理策略（默认开）。
+
+**新增显示**
+- 记忆质量评估新增“回放整理正确率”“整理丢失率”“真实题整理正确率”和调用成本；
+- “三路回放”卡片：每道题三组的结果（✓、✗、⚠）和结论，以及学到的回归题；
+- “整理策略”卡片：当前版本、候选和通过次数、历史，以及“回滚”按钮。
+
+**新增接口**：`POST /knowledge/strategy/rollback`。
+
+**测试和备份**
+- 测试：`test/knowledge-replay.test.js`（8 个），`test/knowledge.test.js` 已同步更新。
+- 改前备份：`.before-replay-20261106.bak`，包括 `lib/knowledge/consolidate.js`、`lib/knowledge/evaluate.js`、`README.md`。
+- `lib/knowledge/service.js`、`lib/host.js`、`lib/engine.js`、`settings.html` 这次没有单独备份，最近的备份是改设置页前的 `.before-knowledge-ui-20261106.bak`。
+
+### 2026-11-06 补充：补齐计划里的四处差异
+对照“长期知识协调与质量治理”的计划，补上之前没做到的四处。
+
+**1. 读取主动进行插件**（新来源 `agency`，设置页“读取哪些记忆库”多了“主动进行”开关）
+- 读三类记录：
+  - 主动回合的处境与结果；
+  - 她自己选择的当前活动、判断和念头（`censhu-agency/current.json`）；
+  - 还挂念的打算（`notes`）。
+- 工具调用、报错、等待、恢复这类运行记录不读；"尚未形成选择"的回合也不读。
+- 按共享处理，因为生活插件本来就把她的当前活动和念头放进她的会话上下文。
+- 目前真实数据里只有 1 条有效记录（当前活动）。之前的 16 条回合结果都是 402 欠费期间的运行记录，被过滤掉了。
+
+**2. 活跃度接上“预算选中”的反馈**
+- 上下文预算（`lib/context-budget.js`）新增可选回调 `onSelection`：每轮选完后报告选中了哪些资料。回调失败不影响本轮组装。
+- 知识块被预算选中阅读时，给本轮提供的那些条目各记一次“被选中”。没有模型决定时（例如预算服务故障退回本地规则），不算使用。
+- 下面这套固定的强弱规则现在只是兜底：Gemini 还没判断过的条目，或者关掉了“活跃度强弱由 Gemini 判断”时才用（见下一节）。规则是：“被选中”最多加 0.2 倍权重，7 天内有效，不重置淡出时间；被回忆工具调出会重置淡出时间。
+
+**3. 私人知识在私人生活会话里提供**
+- 私人生活会话指私人生活插件登记的独处显示会话（`censhu-inner-life/display-session.json`）。
+- 在这个会话里，生活插件只挂一段长期知识上下文（共享 + 私人，条数受同一设置限制），不挂生活插件的其他内容。
+- `censhu_knowledge_recall` 在这个会话里调用时，也能查到私人条目。
+- 在岑舒的普通会话（QQ、桌面）里仍然只有共享条目，私人内容不会出现。
+
+**4. 写回门槛改由 Gemini 判断**（新设置 `memoryWritebackDynamic`，默认开）
+- 提炼记忆时，Gemini 逐项给出 `keep`，综合重要性、稳定性、主体是否明确和长期影响来判断是否值得写回，不套用固定分数线。
+- 重要性仍须不低于 50（`WRITEBACK_FLOOR`），可信度仍须不低于 90。
+- 关闭后，或模型输出里没有 `keep` 时，沿用“自动记忆最低重要性”（默认 75）。
+- 设置页“运行设置”里新增开关“由 Gemini 判断是否值得写回”。
+
+**测试和备份**
+- 新测试：`test/knowledge-gaps.test.js`（8 个）。`test/knowledge-settings.test.js` 已同步更新。
+- 改前备份：`.before-gaps-20261106.bak`，包括 `lib/knowledge/sources.js`、`lib/knowledge/service.js`、`lib/knowledge/salience.js`、`lib/host.js`、`lib/engine.js`、`lib/context-budget.js`、`lib/memory-writeback.js`、`settings.html`、`README.md`。
+
+### 2026-11-06 补充：活跃度强弱交给 Gemini 判断
+代码在 `lib/knowledge/activity-review.js`。活跃度只影响排序和放进上下文的先后，不删除、不改写任何记忆。
+
+**记录哪些使用**（`knowledge/activity.json`）
+- 被回忆工具主动调出；
+- 被上下文预算选中阅读；
+- 提供给预算但没被选中（新增，用来让 Gemini 看出哪些条目总被略过）。
+
+每类都记次数和最近一次时间。
+
+**Gemini 判断什么**（每条知识单独判断，不同条目可以差别很大）
+- 权重：0.5–2，1 为中性；
+- 哪种使用能让它"重新变新"：只有被主动调出才算、被预算读到也算，或者使用都不算、只看事情本身的时间；
+- 从那个时间点起保持多少天不淡出：1–365 天，会覆盖整理时给的默认天数；
+- 多少天后再判断一次：1–60 天。
+
+**什么时候判断**
+- 只判断有使用记录、仍然有效的条目；
+- 第一次有使用、到了上次给的复查时间，或者又被主动调出过，才会再问；
+- 每 30 分钟最多一批（20 条），时间都写成北京时间文字交给 Gemini。
+
+**范围和失败处理**
+- 超出范围的数值会被截到范围内；格式不对的条目丢弃。
+- 失败（402、超时、格式错误）只记录退避，继续用上一次的判断。
+- 稳定事实、约定和验证过的方法仍然不按时间淡出。
+- 还没判断过的条目，或者关掉这个功能时，用原来的固定规则兜底。
+
+**设置页**（❖ 长期知识）
+- 新开关"活跃度强弱由 Gemini 判断"（`knowledgeActivityReview`，默认开）；
+- 运行状态多了"活跃度判断"：判断过多少条、上次时间、出错原因；
+- 每条知识展开后能看到使用次数和 Gemini 的判断：权重、怎样算重新变新、保持天数、理由、下次判断时间。
+
+**测试和备份**
+- 新测试：`test/knowledge-activity.test.js`（4 个）。`test/knowledge-gaps.test.js` 已同步更新。
+- 改前备份：`.before-activity-review-20261106.bak`，包括 `lib/knowledge/salience.js`、`lib/knowledge/service.js`、`lib/engine.js`、`settings.html`、`README.md`。
+- 其中前四个是改完后按改动内容逆向还原出来的（这次改之前忘了先备份），已核对：能正常解析，内容就是改之前的版本。
+
+### 2026-11-07 补充：再交给 Gemini 的两处判断，以及工具绑定的补充
+先核对了还有哪些地方仍是固定规则：
+- 已经由 Gemini 判断的：
+  - 生活节奏里的约 17 项时间（生活事件、提及冷却、内容重新生成、独处间隔、主动联系、空间发布、画画灵感等）；
+  - 情境证据的有效期；
+  - 写回门槛、长期重要度、活跃度。
+- 仍是固定规则但应该保留的：
+  - 安全过滤，例如密钥、注入文字、测试会话标记；
+  - 纯机制参数，例如批次大小、轮询间隔；
+  - Gemini 不可用时的兜底规则（例如 `situation.js` 的 `ruleSignals`，代码里写明它不会被当成语义证据）。
+
+剩下两处改成由 Gemini 判断：
+
+**1. 长期知识逐条交给上下文预算挑选**
+- 以前：排名前 10 的知识作为一整块交给预算，预算只能整块要或不要。
+- 现在：每条知识单独一段（`knowledge:item:<id>`），每段都能单独读懂。现有的 Gemini 上下文预算按本轮相关性挑选读哪几条。设置里的条数变成候选上限。
+- 使用反馈随之变准：被挑中的条目记"被选中"，没被挑中的记"略过"，再交给活跃度判断（Gemini）。
+- 质量评估的回放和私人生活会话仍然使用整块格式。
+
+**2. 下一次质量评估由 Gemini 安排**
+- 每次评估结束后，Gemini 根据这次的结果（指标、整理丢失和回查补救等题数、策略调整进展、新学到的回归题）和知识库的变化量，给出三项安排：
+  - 多少天后再评估；
+  - 知识再变更多少次就提前评估（原来固定 50 次）；
+  - 下次出几道真实题。
+- 设置里的"质量评估最长间隔"和"出题数上限"变成上限。
+- 安排失败时，按设置执行。
+- 设置页"记忆质量评估"里会显示 Gemini 的安排和理由。
+
+**工具绑定补充**（`lib/tool-bindings.js`）
+
+先按 11-06 13:47 她的会话实际提供的 471 个工具，加上源码里还没生效的 `censhu_knowledge_recall`，逐个核对。表里所有名称都确认存在。
+
+- **始终绑定**，新增 `censhu_context_recall`、`censhu_question_recall`、`censhu_knowledge_recall`：
+  - 上下文本身会让她调用这三个工具：省略资料的提示、生活上下文的按需回看提示、长期知识条目；
+  - 但挑选工具的模型看不到这些上下文，以前可能出现上下文让她调用、工具却没有声明的情况。
+- **伴随绑定**：
+  - 抖音刷视频：`douyin_watch_start` 带上整轮流程，即打开、观察、下一条、边看边记、写感受、判断还看不看、结束；`douyin_watch_react` 和 `douyin_watch_note` 成对出现；
+  - `douyin_comment` → `douyin_read_comments`；`douyin_notice_list` → `douyin_notice_reply`；`douyin_chat_offers` → `douyin_chat_reply`、`douyin_chat_read`；
+  - QQ：`qq_reply` → `qq_get_recent_messages`（要引用的消息 id）；读取消息 → `qq_get_forward_msg`（合并转发）；
+  - 记忆：
+    - `engram_review_queue` → `engram_review`、`engram_report`；
+    - `engram_neighbors`、`engram_episode_timeline`、`engram_timeline` → `engram_examine`；
+    - `mdcg_get`、`mdcg_verify` → `mdcg_search`（灵枢的 `lingshu_mdcg_*` 同样处理，两者分开）；
+    - `mnemon_memory_body_*` → `mnemon_memory_bodies`；`mnemon_document_create`、`mnemon_document_manage` → `mnemon_document_search`；
+    - `memory_review_status` → `memory_suggest`；
+  - OpenViking：`forget`、`download` → 同服务的 `find`（先找到 viking:// 地址）；
+  - `cosplay_upsert` → `cosplay_list`。
+- **清理**：浏览器规则里去掉了已经不存在的 `browser_direct_*`。
+
+**测试和备份**
+- 新测试：`test/knowledge-gemini-plan.test.js`（3 个）；`test/tool-bindings.test.js` 新增 4 个。
+- 改前备份：`.before-gemini-tools-20261106.bak`，包括 `lib/tool-bindings.js`、`test/tool-bindings.test.js`、`lib/engine.js`、`lib/host.js`、`lib/knowledge/service.js`、`lib/knowledge/salience.js`、`lib/knowledge/evaluate.js`、`settings.html`、`README.md`。
+- 其中 `lib/host.js` 的备份是改完后按唯一的一处改动逆向还原的。
+
+### 2026-11-07 适配 DSH 0.2.2-rc.1
+- DSH 0.2.2 起，`system-prompt/assemble` 的对象里不再有 `tools`。上下文预算原来从那里估算工具定义占用的 token，新版会算成 0，可能放进超出窗口的资料。
+- 预算新增 `toolsFor(agent)`：`assembly.tools` 不存在时，改从宿主读取这个代理的工具定义（`ctx.tools.schemas(agent)`）。只用于估算和预览，失败时按空列表处理，不影响组装。DSH 0.2.1 仍用原来的 `assembly.tools`。
+- 请求投影（`adapterStream` 边界）、工具绑定、事件名与会话格式在 0.2.2 中都没有变化，已逐项核对。
+- 测试：`test/context-budget-host-022.test.js`（2 个）。
+- 改前备份：`lib/context-budget.js`、`lib/host.js`、`README.md` 的 `.before-dsh-0.2.2-20261107.bak`。
+
+## 2026-11-07 DSH 0.2.2 工具执行改为批量（启动后核查发现）
+- 0.2.2 起，`ctx.tools.execute` 改为批量调用：要传 `{calls:[{type:'tool-call', id, name, arguments: JSON 文本}], agent, signal}`，返回 `{results:[{callId, result}]}`。旧的单次写法 `{name, arguments, agent, callId, signal}` 会直接报 `Tool batch execution failed`。
+- 受影响的有：记忆写回、记忆纠正、旧记忆复核、人格来源读取、Pet 纠正、审核写入（`auditedWrite`），以及 `/memory/health`。
+- 新增 `lib/host-tools.js` 的 `executeHostTool(tools, input)`，参照 dsh-mnemon 的写法：
+  - 宿主有 `tools.setExecutor` 时按批量方式调用，只取回这次调用的结果；
+  - 没有时原样调用旧接口；
+  - 宿主内的守卫、审批和结果观察照常生效；审核写入的许可凭 callId、工具名、参数核对，新版下同样有效。
+- 7 个文件里的 10 处调用都已改用这个函数：`host.js`、`legacy-memory-review.js`、`memory-correction.js`、`memory-writeback.js`、`personality-sources.js`、`pet-correction.js`、`reviewed-write.js`。
+- 更新前的兼容检查只核对了名字是否存在，没有核对参数格式，所以漏掉了这一处。之后又把新旧宿主的方法签名逐个对比了一遍（`dsh-update-0.2.2-rc.1/sig-diff.cjs`），插件用到的只有这一处会出问题。
+- 测试：`test/host-tools-022.test.js`（4 个）。
+- 改前备份：上述 7 个文件和 `README.md` 的 `.before-tool-batch-20261107.bak`。
+
+## 2026-11-07 记忆健康检查改用岑舒主会话
+- `/memory/health` 和 `/simulate/judge` 原来取"第一个已绑定的会话"。私人显示会话 `91b8346d` 最先载入，而独处插件的 `lifeActionGate` 只在主动进行插件接管回合时才允许这个会话调用工具，所以健康检查一直显示"记忆插件未就绪"。
+- 改为 `roleAgent()`：优先用 `characters/censhu/integration.json` 里的岑舒主会话，其次用任意非私人的已绑定会话，最后才退回原来的方式。
+- 改前备份：`lib/host.js.before-health-agent-20261107.bak`。
+
+## 2026-11-07 长期知识页的测试键
+- 在"运行状态"下面新增"试跑测试"卡片，里面有两个按钮：
+  - **测试长期记忆整理**：
+    - 只读读取各个记忆库；
+    - 取最多 6 条待整理的来源，交给 Gemini 判断一次，大约 1 次调用；
+    - 逐条显示判断结果：新知识、重复、进展、更正或无关，以及会新建还是归入哪个条目、判断理由。
+  - **测试三路回放**：
+    - 用当前生效的整理策略跑 8 道虚构题（其中 2 道是留出题）；
+    - 有正式知识条目时，再从中出最多 2 道真实题；
+    - 显示原文组、整理组、可回查组的正确率，以及逐题结果；
+    - 要调用模型几十次，点击前会先确认。
+- **两者都不落盘**：
+  - 整理只作用在 `index.json` 的临时副本上，不写入，也不保存向量缓存；
+  - 回放不保存回归题、不提出也不记录策略、不写评估结果；
+  - 原记忆库只读；
+  - 生活后台暂停时也可以用。
+- **运行规则**：
+  - 同一时间只跑一个测试，最多 10 分钟；
+  - 最近一次结果只保存在内存里，重新打开页面还能看到；
+  - 402 / 429 / 401 / 403 会翻译成原因和处理办法。
+- **代码位置**：
+  - `lib/knowledge/dry-run.js`（`trialConsolidation`、`trialReplay`）；
+  - 服务层的 `testConsolidation`、`testReplay`、`trials`；
+  - 接口 `GET /knowledge/test`、`POST /knowledge/test/consolidate`、`POST /knowledge/test/replay`。
+- **页面改动**：
+  - 三路回放的统计格和逐题表提取为 `replayBody()`，正式评估和测试共用；
+  - 统计格新增"原文组"正确率；
+  - 知识条目的类别和阶段改为显示中文。
+- **测试**：`test/knowledge-dry-run.test.js`（4 个），用于确认所有路径都不改动 `DSH_HOME` 下的任何文件。全部 563 个测试通过，9 个跳过。
+- **改前备份**：`lib/knowledge/service.js`、`lib/host.js`、`settings.html`、`README.md` 的 `.before-knowledge-tests-20261107.bak`。
+
+## 2026-11-07 三路回放的题目改为每次重新出
+- **整套虚构题**：
+  - 每次评估由 Gemini 新出一套虚构情境，包括 7–14 条分波到达的记录和 8 道题。
+  - 6 道检验题分别考进展、更正、跨库重复、对照、私人隔离和"不知道"，另有 2 道留出题，考时间或多跳。
+  - 同时标注程序检查要用的记录：哪两条是重复、哪条是更正等。见 `lib/knowledge/synthetic.js`。
+- **检验与兜底**：
+  - 程序先逐项核对：题型是否齐全；答案关键词是否逐字出现在必需记录里；更正和私人关键词是否对得上；有没有与真实记忆（包括私人记录）连续 8 字相同的照抄。
+  - 然后交给 Gemini 独立审核。
+  - 不合格时，把原因告诉 Gemini 再生成一次；仍不合格就改用内置题（原来那 8 道），评估照常进行，原因会显示在页面上。
+- **其他内容一并更新**：
+  - 检索基准的改写句也每次重新生成，不合格时用内置的 9 组。
+  - 最近 8 套题的主题会记下来，下次出题时避开。
+- **策略对照**：
+  - 第一次在发现问题的那套题上对照，新策略必须修好至少一项、且没有任何回退。
+  - 第二次换一套新出的题，新旧策略都重跑，只要没有任何回退就通过（`compareRuns(..., {confirm: true})`）。
+  - 两次都通过才切换。
+- **指标计算**：各项指标改为按题型取这套题里对应的检验题，不再依赖固定题号。程序检查改由 `suiteChecks(index, spec)` 按每套题自己的标注计算；内置题的计算结果与原来相同。
+- **测试键**：页面上的"测试三路回放"也使用新出的题。
+- **测试**：`test/knowledge-dynamic-suite.test.js`（7 个）。全部 570 个测试通过。
+- **改前备份**：`lib/knowledge/evaluate.js`、`replay.js`、`strategy.js`、`dry-run.js`，以及 `settings.html`、`README.md` 的 `.before-dynamic-suite-20261107.bak`。
+
+## 2026-11-07 长期知识页的状态提示与配色
+- `/knowledge` 接口新增两个字段：
+  - `background`：生活后台是否暂停、暂停原因、从什么时候开始暂停；
+  - `gemini`：Gemini 是否暂停（`geminiPauseStatus()`），是手动暂停，还是因为 402 等错误自动暂停、要停到什么时候。
+- **页面顶部提示**：会说明为什么还没运行，并指出去哪里恢复。生活后台暂停时，提示到"启动与中断恢复"页恢复；Gemini 因 402 自动暂停时，显示暂停到几点，并说明充值后会自动恢复。
+- **"运行状态"标签按状态分色**：
+  - 已同步、整理中：绿色；
+  - 尚未开始：黄色；
+  - 等待重试：红色；
+  - 已关闭：虚线框。
+- **记忆库读取情况**：改成带圆点的彩色状态，分别显示条数、失败、已关闭、未读取。
+- **"候选信号"格**：大字显示用了几路，下方小字列出是哪几路。
+- 本地预览核对过暂停、正常运行和等待重试三种状态，以及深色主题。
+- **改前备份**：`lib/host.js` 和 `settings.html` 的 `.before-knowledge-ui2-20261107.bak`。
+
+## 2026-11-07：Pet 不再经过 Argon（Gemini）语句审核
+
+- **改了什么**：Pet 的所有输出（网页端和桌面端的文字回复、实时语音对话、碎碎念）都不再经过 Gemini 语句审核，直接输出。
+- **为什么**：
+  - 实时语音等不起一次审核，会超时；
+  - Gemini 暂停时，碎碎念会因"Argon语句审核未完成"生成失败。
+- **DSH 桌面回复**：仍然先审核再输出，没有变化。
+- **代码改动**：
+  - `lib/reply-expression.js`：`replySurface` 对 `sessionId==='dsh-pet'` 返回 null；
+  - `lib/host.js`：状态里的审核范围改为 `['desktop']`；
+  - `lib/context-settings.js`：说明文字同步更新。
+- **测试**：
+  - `test/reply-expression.test.js`：新增 Pet 直通检查，确认不调用评审、不写审核记录；
+  - `test/reply-expression-runtime.test.js`：改为桌面端审核、Pet 原样通过。这个测试需要设置 `DSH_RUNTIME_ROOT`，0.2.2 安装目录里找不到 `cordis/lib/index.js`，所以平时会跳过；改前的版本在这个目录下也同样跑不起来。
+- **改前备份**：上述文件和本 README 的 `.before-pet-no-review-20261107.bak`。
+
+## 2026-11-07：知识嵌入遇网络瞬断自动重试一次，监控记录真实原因
+
+- **起因**：Gemini 充值后，调用从 13:16 起已恢复正常。13:26:08 有一次 `knowledge-embedding` 失败，没有 HTTP 状态码。监控页因为显示的是最近一条记录，就一直挂着"连接或本地配置异常"。前后几次调用都成功，判断是经代理并发请求时网络瞬断。
+- **`lib/knowledge/embedding.js`**：
+  - 新增 `transientNetworkError(e, signal)`，判定条件：
+    - 没有 HTTP 状态码；
+    - 不是取消或超时；
+    - 错误信息属于连接中断类：`fetch failed`、`ECONNRESET`、`UND_ERR_SOCKET` 等。
+  - 符合条件时等 1.5 秒重试一次，只重试一次。
+  - HTTP 错误（402 等）、取消、返回条数不符都不重试。
+- **`lib/gemini-telemetry.js`**：
+  - 失败记录的 `code` 现在会补上 undici 藏在 `cause.code` 里的网络原因；
+  - 新增 `detail` 字段，记录错误信息，最多 120 字，key 和地址会被隐藏；
+  - 诊断文字会写明"网络连接中断（ECONNRESET）……"。
+- **测试**：新增 `test/knowledge-embedding-retry.test.js`（5 项），使用临时 `DSH_HOME`。
+- **改前备份**：上述两个文件和本 README 的 `.before-net-retry-20261107.bak`。
+
+## 2026-11-07：第一层语句审核加入“常见模板化表达检查”
+
+- 来源：从 [op7418/Humanizer-zh](https://github.com/op7418/Humanizer-zh)（MIT）的 31 条里挑出 10 类聊天里常见的写法，压缩成约 530 字，放在 `lib/qq-grounding.js` 的 `commonExpressionPatterns`。
+- 范围：经由 `qqExpressionGuidance` 同时进入 QQ 发送前审核（`groundingPrompt`）和桌面回复审核（`expressionPrompt`），各只出现一次。Pet 仍不审核。
+- 用法：只作检查线索，不是禁词表；每条都写了什么情况要保留。Argon 照旧只给问题、方向和可选示例，由岑舒决定改不改。
+- 测试：`test/reply-expression.test.js` 新增一条，检查两处提示词各含一次清单、保留规则在、长度低于 800 字。
+- 需要重启 DSH 生效。备份：`*.before-humanizer-checklist-20261107.bak`。
+
+## 2026-11-07：测试会话只读生活状态
+
+- 测试目录下的会话（由内心生活插件的 `isTestSession` 判断）不绑定、不观察来信，只在组装时挂一段 `cen-shu-life-readonly`：内容是岑舒正式会话当前生活状态的只读副本，加上她最近选择的活动与念头，上限 2 万字。
+- 只做渲染：不做情境分类、不刷新生活规划、不准备独处内容、不保存记忆证据，也不写任何文件。
+- `censhu_life_context` 在测试会话里返回同一份只读状态的全文；`censhu_read_memory` 读取正式角色的记忆，但不记录证据。
+- 写入工具由内心生活插件的工具隔离拒绝（见该插件 README）。
+- 测试：`test/test-session-readonly.test.js`。需要重启 DSH 生效。备份：`*.before-test-readonly-20261107.bak`。
+
+## 2026-11-07：抖音会话的内容不自动送去记忆审核
+
+- 抖音插件的刷视频会话和私信会话（`douyin-censhu`、`douyin-censhu-*`、`douyin-dm-*`）里的内容，大多不需要记忆，不再自动送去记忆审核。以前刷视频提示每次都会送审，结果基本都是 0 条。
+- 她看了想记的，会写成观看笔记 / 瞬间，由抖音插件通过 `recordDouyinWatch` 送来（带 `watchId`），照常审核后写进记忆插件。
+- 保险：旧版遗留在队列里的这类会话来源，审核时只收重要度 >= 90 的条目，也不用动态门槛放宽。
+- 其他会话不受影响。
+- 测试：`test/douyin-low-memory.test.js`。与记忆写回相关的测试共 16 项全部通过。备份：`lib/memory-writeback.js.before-douyin-low-memory-20261107.bak`、`README.md.before-douyin-low-memory-20261107.bak`。需要重启 DSH 生效。
+
+## 2026-11-07（续）：子代理带上她的全部状态；抖音私信 / 评论笔记
+
+- **子代理**：
+  - 她需要并行处理任务时开的子代理，现在会挂一份她此刻全部状态的只读副本（心情、内在状态、生活、私人想法、最近的活动）。开头说明它是她开的子代理，结果交回她。
+  - 只认她的会话开的子代理：上层会话绑定在她的生活上，或者是抖音的刷视频、社交、重看会话。测试会话开的子代理不挂。
+  - 子代理不在绑定列表里，所以不会观察来信、不写记忆、不触发心情事件。想记的交给她自己决定。
+  - 实现：新增 `lib/subagent-state.js`。`host.js` 从 `agents.list()` 里找子代理（`roots()` 不含子代理），每 3 秒检查一次，所以子代理刚开时的第一轮可能还没挂上。
+- **私信 / 评论笔记**：
+  - 新接口 `recordDouyinNote`（在 `shared-context.js`）：抖音插件的 `douyin_social_note` 写下的笔记，带 `douyin-note:<编号>` 送去记忆审核，和观看记录走同一路。
+  - 对方原话只作引用，不当成她的经历。
+- **重看会话**：`douyin-revisit-*` 也算抖音会话，会话内容不自动送去记忆审核。
+- **测试**：新增 `test/subagent-state.test.js`（3 项）。全量测试 592 项中 583 项通过，0 项失败，其余 9 项没有执行。
+- **备份**：`lib/host.js.before-subagent-state-20261107.bak`、`lib/shared-context.js.before-douyin-notes-20261107.bak`、`README.md.before-douyin-notes-20261107.bak`。需要重启 DSH 生效。
+
+## 2026-11-07（续）：开不开子代理由她自己判断
+
+- 她的顶层会话（绑定生活的会话）新增一段系统提示 `censhu-subagent-policy`（`SUBAGENT_POLICY`，在 `lib/subagent-state.js`）。
+  - 同时有几件互不依赖的事要处理时，由她自己判断要不要用 DSH 自带的 `subagent` 工具分头做。
+  - 一件事，或者几件事前后相关时，按顺序自己做，不用开子代理。
+- 子代理自己收不到这段提示（只挂在顶层会话上）。子代理带的是她此刻全部状态的只读副本，见上一节。
+- `subagent` 工具由 DSH 内置的 tool-subagent 提供，可选模型在 `cordis.patch.yml` 的 subagent-model-selection-settings 里设置。
+- 测试：`test/engine.test.js` 的挂载检查加上了这一项（备份 `test/engine.test.js.before-subagent-policy-20261107.bak`）；`test/subagent-state.test.js` 共 4 项。全量 593 项中 584 项通过，0 项失败，其余 9 项没有执行。需要重启 DSH 生效。
+
+
+## 2026-11-07（续）：整体分头判断（Terra）
+
+- **新模块** `lib/parallel-judge.js`：判断她手上同时有的几件事，要不要分给子代理并行做。
+  - 模型：`gpt-6.1-terra`。复用 `terra-review.js`，密钥直接读本机环境变量 `OPENAI_API_KEY`（这里只写键名，不记录值）。走设置里的本机代理（`semanticProxyUrl`）。
+  - 输入：每件事一句话，加上她此刻的全部状态（与子代理拿到的只读副本相同）。
+  - 输出：要不要分（parallel）、理由、最多 4 组（每组交给一个子代理，带一句交代）、留给她自己做的事。插件会核对：去掉越界或重复的编号；全部放进一组等于没分。
+  - 只有一件事时不调用模型。
+  - 只给建议，不替她开子代理。开不开、怎么分由她决定，开的话用 `subagent`。
+- **新工具 `censhu_parallel_decide`**：她拿不准时自己调用。已列为只读工具（`tool-semantics.js`）。
+- **共享接口 `judgeParallel`**：给其他插件用。抖音插件在“私信汇总”和“多条评论通知”时会自动调用，把建议写进提示里。
+- **“分头处理”提示**：加了一句“拿不准时可以先用 censhu_parallel_decide”。
+- **测试**：新增 `test/parallel-judge.test.js`（4 项，用假模型，不发网络请求）。全量 597 项中 588 项通过，0 项失败，其余 9 项没有执行。哈希 13 项、9 项都是 OK。
+- **备份**：`lib/tool-semantics.js.before-parallel-judge-20261107.bak`、`README.md.before-parallel-judge-20261107.bak`。需要重启 DSH 生效。
+
+
+## 2026-11-07（续）：抖音“只看不写”的心情事件
+
+- **新接口 `recordDouyinGlance`**（在 `lib/shared-context.js`）：抖音一轮里只看没写感受的作品，汇总成一次心情事件。
+  - 事件类型 `media-douyin`，名称“刷抖音时随手看过的视频”，感受交给心情模型判断。
+  - 每轮只发一次，按 `douyin-glance:<轮次>` 去重，记在 `video-effect-receipts.json`。
+- **不做的事**：不写进生活印象，不送记忆审核。
+- **测试**：新增 `test/douyin-glance.test.js`（1 项）。全量 598 项中 589 项通过，0 项失败，其余 9 项没有执行。
+- **备份**：`lib/shared-context.js.before-douyin-glance-20261107.bak`、`README.md.before-douyin-glance-20261107.bak`。需要重启 DSH 生效。
+
+
+## 2026-11-07（第二轮完善）
+
+- **子代理第一轮就带上她的状态**：子代理一启动（DSH 的 `subagent/start` 事件），或者收到第一条消息，就立刻挂上她的只读状态。3 秒一次的检查保留作兜底。
+- **每天心情事件上限交给模型动态决定**（新文件 `lib/mood-budget.js`）：
+  - 原来固定是设置里的 `lifeMoodDailyLimit`（8）。现在由 Gemini 看今天已经发生的事、她此刻的状态和时间段，决定今天的总上限。
+  - 范围 4～24，而且不低于今天已经用掉的。
+  - 每 3 小时最多问一次；快用满（剩 1 个以内）时提前再问。模型不可用时用设置里的固定值。
+  - 结论记在 `mood-budget.json`，`/state` 里可以看到 `moodBudget`。社交经历仍不占这个上限。
+- **Terra 分头判断改进**（`lib/parallel-judge.js`）：
+  - 每件事可以带 who（是谁的事）和 resource（page / chat / none）。
+  - 规则能定的不问 Terra：只有一件；都是同一个人的；每组都要用同一个专用页面。
+  - Terra 收到这些标注和约束说明。插件会核对它给的分组：同一个人的事并到一组；用页面的组只留一个，多出来的页面任务留给她自己按顺序做。
+  - `censhu_parallel_decide` 工具新增可选的 who、resource 参数。
+- **分头建议记录**：每次建议记一行（来源、几件事、怎么分、是规则定的还是 Terra 给的），记在 `parallel-advice.json`，只留最近 50 次，以后可以回看分得合不合理。
+- **测试**：新增 `test/round2.test.js`（5 项）。全量 603 项中 594 项通过，0 项失败，其余 9 项没有执行。
+- **备份**：`lib/*.before-round2-20261107.bak`、`README.md.before-round2-20261107.bak`。需要重启 DSH 生效。
+
+
+## 2026-11-07（续）：抖音工作会话走动态上下文拼接
+
+- **不再自动绑定**：抖音的刷视频、社交、重看会话不再被自动绑定为“有人聊天的桌面会话”。插件的投递在 DSH 里也算“用户发言”，绑定后会被当成青枔的话，拿去分类情境、影响心情，还会成为主动说话的目标。以前自动绑定过的（`douyin-censhu`）也从绑定里移掉了（`desktop-bindings.js`）。
+- **改成“工作会话”**（`host.js` 的 `workMounted`），和她的其他会话一样每轮动态拼接：
+  - 她此刻的生活和心情：取自正式生活会话，按上下文预算拼进系统提示，含她自己最近选择的活动与念头。
+  - 一段说明：这是抖音工作会话，会话里的消息是插件转来的资料和安排，不是青枔说的话。
+  - 记忆说明：这里的内容不自动进记忆，想记的自己写笔记。
+  - 分头处理的说明。
+  - 工具和技能：本来就由请求投影按任务挑选。
+- **工作会话不做的事**：不观察来信、不分类情境、不写记忆、不触发心情、不当主动说话的目标。测试会话和子代理不算工作会话。
+- **共享接口**：新增 `servesWorkSessions: true`，让抖音插件知道生活状态已经在这里拼接，不必再塞进提示。
+- **测试**：新增 `test/work-sessions.test.js`。全量 603 项中 594 项通过，0 项失败，其余 9 项没有执行。
+- **备份**：`lib/*.before-work-sessions-20261107.bak`、`README.md.before-work-sessions-20261107.bak`。需要重启 DSH 生效。
+
+## 2026-11-07（续）：抖音工作会话也能用 censhu_life_context
+
+- 重启后实测发现：她在刷视频会话里第一步调用 `censhu_life_context` 查自己的状态时报错（“当前会话未绑定岑舒生活插件”），因为工作会话不算绑定会话。
+- 现在工作会话也能调用。返回的是正式生活会话此刻的状态（只读，开头注明“抖音工作会话 · 只读”），不刷新生活判断、不写任何记录。
+- 测试：全量 605 项中 596 项通过，0 项失败，其余 9 项没有执行；哈希 13 项、9 项都是 OK。备份：`lib/host.js.before-work-life-tool-20261107.bak`。需要重启 DSH 生效。
+
+
+## 2026-11-07（续）：抖音工作会话的做法走预算拼接
+
+- **新增共享接口**：`registerWorkGuide(fn)`（以及标记 `servesWorkGuides: true`）。抖音插件登记一个函数，按会话编号返回这条线的做法分段，每段带优先级、是否必带。
+- **拼接方式**：工作会话每轮组装时，把这些分段作为单独一组（`douyin-lane-guide`），和她的生活状态一起走上下文预算，放不下时先省掉次要的段落。生活状态读不到时，做法照样会拼上。
+- **测试**：全量 605 项中 596 项通过，0 项失败，其余 9 项没有执行。备份：`lib/host.js.before-work-guides-20261107.bak`。需要重启 DSH 生效。
+
+
+## 2026-11-07（续）：上下文预算新增来源“工作做法”（work）
+
+- 预算模型原来按三个来源分配：生活 / 独处 / 主动进行。现在出现工作做法候选（抖音工作会话里这条线的做法分段）时，多一个来源 `work`。
+- 模型为 `work` 给配额和理由，并按本轮要做的事挑选放进 `order` 的段落。规则段由抖音插件标为必带。
+- `work` 是可选配额，没有这类候选时不用给，原有会话不受影响。模型这一轮没单独给 `work` 配额时，做法全部保留，不会因为漏答而丢失。预算模型不可用时，做法按原顺序放得下多少放多少。
+- 以前没有这个来源，做法会被算到“主动进行”名下，模型容易误判。
+- 测试：新增 `test/context-budget-work.test.js`（3 项）。全量 608 项中 599 项通过，0 项失败，其余 9 项没有执行。备份：`lib/context-budget.js.before-work-owner-20261107.bak`、`lib/host.js.before-work-owner-20261107.bak`。需要重启 DSH 生效。
+
+## 2026-11-08：B 站也分成三个工作会话
+
+- lowMemorySession 认得 B 站的会话：bili-watch-*、bili-social-*、bili-revisit-*，以及旧的固定会话 bili-whale。这些会话和抖音的一样当作工作会话：她此刻的生活和心情按预算拼进去；会话内容不会自动写进记忆；也不自动绑定。
+- 「角色记忆使用」那句说明按平台写：B 站的会话写日记、观看记录、node bili.mjs social-note。做法拼接名按平台区分（bili-lane-guide / douyin-lane-guide）。
+- 新增 recordBiliNote：B 站私信、评论、直播间里的社交笔记，带 noteId，和抖音同一条路送记忆审核。
+- 测试：更新 test/douyin-low-memory.test.js 和 test/work-sessions.test.js。全量 608 项中 598 项通过，1 项失败（知识评估那项，改之前也失败，跟这次改动无关），其余 9 项没有执行。
+- 备份：lib/*.before-bili-lanes-20261108.bak、lib/shared-context.js.before-bili-note-20261108.bak。需要重启 DSH 生效。
+
+### 2026-11-08：B 站的「只看不写也影响心情」
+- 新增 `recordBiliGlance`：B 站插件把一轮里看过却没留下感受的视频交过来，汇总成一次心情事件（模板 `media-bili`，名字“刷B站时随手看过的视频”），由心情模型按看过的内容判断感受。
+- 规则和 `recordDouyinGlance` 一样：每轮只发一次（回执记在 `video-effect-receipts.json`，键是 `bili-glance:<轮次>`）；只影响心情，不写生活印象，不送记忆审核。
+- 测试：`test/douyin-glance.test.js` 新增 1 项。全量 609 项，599 项通过，9 项跳过；失败的 1 项（知识评估）改动前就失败。
+- 备份：`lib/shared-context.js.before-bili-glance-20261108.bak`、`test/douyin-glance.test.js.before-bili-glance-20261108.bak`、`README.md.before-bili-glance-20261108.bak`。需要重启 DSH 生效。
+
+### 2026-11-08 修好知识评估测试（全量 609 项：600 项通过，9 项跳过，0 项失败）
+- 失败的是 `test/knowledge-dynamic-suite.test.js` 里的“evaluation uses the generated suite…”，代码本身没有问题。
+- 原因：评估题目的日期按“现在往前三天”生成，样例题 h2（“哪天说想学陶艺”）的答案写死了 11月4日。测试写于 11-07，往前三天正好是 11-04，所以当时能过；过了 11-07，校验就发现答案不在记录里，退回内置题。
+- 修法：这项测试给评估器固定时钟（`now: () => base + 3 天`），和同文件里生成题目的测试一样。
+- 跳过的 9 项要真实的 OpenViking 服务、QQ 桥或已安装的 DSH，在临时环境里会自动跳过，没有去跑，免得碰到真实数据。
+- 备份：`test/knowledge-dynamic-suite.test.js.before-fixed-clock-20261108.bak`、`README.md.before-fixed-clock-20261108.bak`。
+
+## 2026-11-08：工作会话的标题按平台分开
+- 问题：给工作会话拼上下文时，结尾固定加一句“【抖音工作会话】这里处理插件交给你的抖音的事（刷视频、私信与评论、重看）”，没有区分平台。B站的三个工作会话（刷视频、社交、重看）也收到这句，会被告知“这里处理抖音的事”。上面的记忆规则那段本来就按平台分了，只漏了这一句。
+- 修法（`lib/host.js`）：
+  - 新增 `workLabel`，按会话 id 判断平台（`workPlatform`：`bili-` 开头是 B站，`douyin-` 开头是抖音）。
+  - B站会话现在写“【B站工作会话】这里处理插件交给你的 B 站的事（刷视频、私信评论与直播间、重看）”；抖音会话照旧。
+  - 工作会话里调用 `censhu_life_context` 查生活时，返回的标题也按平台写（“【B站工作会话 · 只读】”或“【抖音工作会话 · 只读】”）。
+  - 两条日志（“工作会话已挂动态上下文”“工作会话上下文组装失败”）也带上平台。
+- 测试：新增 `test/work-label.test.js`（2 项）。全量 611 项：602 通过，0 失败，9 项需要真实服务，在临时 DSH_HOME 下自动跳过。
+- `lib/host.js` 不在哈希登记里；两项哈希检查仍是 13 项、9 项 OK。
+- 备份：`lib/host.js`、`README.md` 的 `.before-work-label-20261108.bak`。
+- 需要重启 DSH 生效。
+
+## 2026-11-08：补伴随工具；B站工作会话固定带命令行
+- 起因：遍历了各插件的 176 个工具说明和 331 次请求记录，找“说明里点名要先用另一个工具，但选中它时那个工具不会自动跟来”的地方。
+- 新增伴随（`lib/tool-bindings.js` 的 `TOOL_COMPANIONS`）：
+  - `douyin_chat_send`、`douyin_chat_read` → `douyin_chat_contacts`（联系人编号只能从这里拿）；
+  - `douyin_chat_reply`、`douyin_chat_send`、`douyin_comment` → `douyin_media_browse`（配图要先在表情库看过；发不发仍由她决定）；
+  - `douyin_chat_reply`、`douyin_notice_reply` → `douyin_social_note`（“想记的自己写笔记”这条在系统提示里，挑工具时看不到）；
+  - `douyin_revisit_start` → `douyin_saved_videos`（要重看的编号从这里来）；
+  - `douyin_watch_react` → `douyin_observe`（只能记刚看过的这条）；
+  - `douyin_chat_stop` → `douyin_chat_start`（停了能恢复）；
+  - `bili_media_save` → `bili_dm_view`（收表情要用那条私信的 key）。
+- 新增“按会话固定”的工具（`WORK_SESSION_TOOLS`）：B站工作会话（`bili-watch-*`、`bili-social-*`、`bili-revisit-*`、旧的 `bili-whale`）每次请求都带上命令行工具 `pwsh` / `bash`（主机提供哪个就带哪个）。她在 B站做的事基本都是跑 `node bili.mjs …`，而写着这条做法的说明是注入的上下文，挑工具时看不到。其他会话不受影响。
+- `applyToolBindings` 多了一个可选参数 `{sessionId}`；`lib/request-context.js` 调用时把会话编号传进去。
+- 没加的：记忆插件里“A 之后通常用 B”的建议顺序（不是硬依赖）；memory-evolve 的 `de_*` 开发协作工具（她平时用不到）。
+- 测试：新增 `test/tool-bindings-1108.test.js`（3 项）。全量 614 项：605 通过，0 失败，9 项需要真实服务，在临时 DSH_HOME 下自动跳过。
+- 这两个文件不在哈希登记里；两项哈希检查仍是 13 项、9 项 OK。
+- 备份：`lib/tool-bindings.js`、`lib/request-context.js`、`README.md` 的 `.before-tool-bindings-20261108.bak`。
+- 需要重启 DSH 生效。
+
+## 2026-11-08：主动进行决定，专用工作区执行
+- 本人定的分工：主动进行接管时，她在主动回合里照旧看到全部处境、决定做什么；要一步步操作的事（上网逛逛、刷抖音或 B站、处理私信评论、重看）交给对应的专用工作区，由她在那里亲自做，做完把她最后说的话作为回执交回主动进行。青枔让她做的事仍在原来的会话里。
+- 生活插件认浏览器工作会话（`browser-browse-*`）：
+  - `lib/memory-writeback.js`：算作工作会话，不自动写记忆；平台识别为 `browser`。
+  - `lib/host.js`：称呼、“这里做什么”整理成一张表（抖音、B站、浏览器）。浏览器会话写“【浏览器工作会话】这里处理插件交给你的你在主动回合里决定的自主浏览”，配上对应的记忆规则：浏览经历会登记给独处插件，想记的写进最后的总结。做法分段用 `browser-lane-guide`。
+  - `lib/tool-bindings.js`：浏览器工作会话固定带 `browser_interest`、`browser_handoff`、`browser_progress`、`browser_task`、`browser_steer` 和 `browser_direct_*`（主机提供哪个就带哪个）。
+- 测试：`test/work-label.test.js` 改写（2 项）；`test/tool-bindings-1108.test.js` 加 1 项。全量 615 项：606 通过，0 失败，9 项需要真实服务，自动跳过。
+- 备份：`lib/host.js`、`lib/memory-writeback.js`、`lib/tool-bindings.js`、`test/work-label.test.js`、`README.md` 的 `.before-browser-workspace-20261108.bak` / `.before-agency-workspace-20261108.bak`。`test/tool-bindings-1108.test.js` 是今天新建的，追加前忘了另存备份。
+- 需要重启 DSH 生效。
+
+## 2026-11-08：抖音社交会话固定带打开浏览器的工具
+- 专用浏览器关着时收不到私信和评论，插件也不会自动打开，所以她在社交会话里必须能用 `douyin_browser_open`。
+- `lib/tool-bindings.js` 的 `WORK_SESSION_TOOLS` 加 `douyinSocial`：抖音社交工作会话（`douyin-dm-*`）每次请求都带上这个工具。刷视频、重看和其他会话不受影响。
+- 测试：`test/tool-bindings-1108.test.js` 加 1 项。全量 616 项：607 通过，0 失败，9 项需要真实服务，自动跳过。
+- 这个文件不在哈希登记里。
+- 备份：`lib/tool-bindings.js`、`test/tool-bindings-1108.test.js`、`README.md` 的 `.before-douyin-browser-open-20261108.bak`。
+- 需要重启 DSH 生效。
+
+## 2026-11-08：心情自动绑定入口
+- `lib/mood-link.js` 新增 `automaticRoleSlot`：`moodLinked` 开着且 `moodSlot` 存在时，鱼的心情把所有工作区和会话都归到这一份。
+- 只影响哪些会话能改变心情；生活上下文和「当前共享心情」仍只注入 `sessionIds` 绑定的会话。
+- 备份：`lib/mood-link.js.before-auto-bind-20261108.bak`、`README.md.before-auto-bind-20261108.bak`。
+
+## 2026-11-08：独处日记进入心情
+- `submitInnerResult` 新增日记分支：`mood.diary===true` 时按日记编号写入一次 `inner-diary` 心情事件，重启和重试都不会重复。
+- 事件名称里写明可能涉及旧事，只有这篇带来新感受才算变化，提醒 Gemini 不要重复计算。
+- 改动：`lib/shared-context.js`；新增 `test/inner-diary-mood.test.js`。备份：`.before-diary-mood-20261108.bak`。
+
+## 2026-11-08：工作会话的上下文拼接修复
+- 起因：查 11-08 21:40 那一轮刷抖音（`douyin-censhu-202611082140`）的会话记录。
+- **系统提示每步重复追加**：`lib/context-budget.js` 把“本轮资料目录”放在系统提示里，每步换快照编号，宿主就把整份系统提示（约 2.9 万字）再追加进历史。12 步累计约 38 万字，上下文 11 分钟涨到约 26 万 token。现在目录放进运行上下文，系统提示保持不变。这一项对所有用这套预算的会话都生效。
+- **工作会话的生活内容**（新文件 `lib/work-context.js`，`lib/host.js` 调用）：
+  - 一定带上：当前心情、正在发生的事、刚结束的事、当前打算、内在状态、想法、她自己选的活动；不再交给预算模型挑掉。
+  - 刷视频、重看、自主浏览的会话去掉 QQ 的表达规则和工具联动说明（`generalStyle`、`【工具联动】`）。抖音和 B站的社交会话要和人说话，保留。
+- `lib/life-director.js`：没有新判断时不再写“等待Gemini判断”，改成“暂时没有新的判断”，免得她把它当成自己的状态。
+- **重复调用提醒被当成任务**（`lib/request-context.js`）：宿主的重复调用提醒（`repeat-tool-reminder`）现在按上下文处理，不再被当成当前任务。原来提醒之后工具从 30 多个降到 24～27 个，点赞、收藏、评论、读评论都被挑掉了。
+- 测试：新增 `test/work-context.test.js`（3 项）；`context-budget`、`context-budget-hints`、`context-budget-turns` 三个测试按新位置更新。全量 623 项：614 通过，0 失败，9 项需要真实服务，自动跳过。
+- 这些文件不在哈希登记里；两项哈希检查 13 项、9 项 OK。
+- 备份：`lib/context-budget.js`、`lib/host.js`、`lib/life-director.js`、`lib/request-context.js`、上面三个测试、`README.md` 的 `.before-watch-fixes-20261108.bak`。
+- 需要重启 DSH 生效；实际效果要看下一轮刷视频的记录。
+
+## 2026-11-08：心情改进七项（生活插件部分）
+- **长内容不再截断**：`media-*` 和 `inner-diary` 事件传给心情时最多 3000 字（原来 200 字）。
+- **减少抖动**：心情提示词要求，旧感受还有效且这次没有明显不同时 `decision=skip`，保持原组合，不换说法重写。
+- **她对青枔的揣测**：心情结果新增 `ownerImpression`（最多 200 字，可空），随当前共享心情交给她，并标明只是揣测、不是事实。
+- **记忆带上当时的感受**：记忆来源入队时记下当时有效的心情标签，写入各记忆库时在正文后附一行“当时的感受（只是她当时的心情，不是事实）”；事实本身和去重不变。感受已过期时不附。
+- **回复前判断**：心情插件通过 `registerMoodPreReply` 登记，主会话拼生活上下文前等待它（等待上限由心情插件控制）。
+- 工作会话必带心情和最近的事，由另一次改动完成（见上文“一定带上”）。
+- 新增 `test/mood-seven.test.js`。备份：`.before-mood-seven-20261108.bak`。
+
+## 2026-11-08：恢复到工作会话修复后的版本，并加三组伴随
+- 按本人要求，撤销了之后两次改动：按工作线固定状态、做法和一批工具；工作会话只声明固定和伴随工具。现在的版本是上一节“工作会话的上下文拼接修复”完成后的状态。
+- 工具规则：全局固定的每次都带；`WORK_SESSION_TOOLS` 里按会话固定的每次都带（B站命令行、浏览器工具、抖音社交的 `douyin_browser_open`）；伴随工具只有 A 被选中时 B 才跟着来；其他由模型动态挑选。
+- 加回三组伴随（`lib/tool-bindings.js`）：`douyin_browser_open` → `douyin_browser_close`；`douyin_media_browse` → `douyin_media_save`、`douyin_media_remove`；`bili_media_browse` → `bili_media_save`、`bili_media_remove`。
+- 恢复 `lib/host.js` 时一度盖掉了别处后来做的一处修改（`moodPreReply` 挪进预算流程），已放回；其余恢复的文件逐行核对过，没有同样的问题。
+- 测试：`test/tool-bindings-1108.test.js` 加 1 项。全量 630 项：621 通过，0 失败，9 项需要真实服务，自动跳过。
+- 备份：撤销前的版本是 `.before-rollback-pin-context-20261108.bak`、`.before-rollback-fixed-only-20261108.bak`；加伴随前是 `.before-companions-20261108.bak`。
+- 需要重启 DSH 生效。
+
+## 2026-11-08：哪些固定，其余交给 3.8 flash
+- 本人定的思路：一部分内容固定，其余由 Gemini 3.8 flash（预算规划）根据我的输入、她此刻的全部状态和预算判断。
+- **固定的**：
+  - 工作做法：在抖音、B站、浏览器的工作会话里固定。其他会话把这些做法作为候选，由 Gemini 决定要不要。
+  - QQ 表达规则（`generalStyle`，名字 `life:style`）：只在 QQ 聊天会话固定（角色绑定的那个会话，或出现过 QQ 令牌、QQ 发送的会话）。其他会话是候选。
+  - 工具联动：所有会话固定。之前从刷视频等会话去掉的做法已撤销。
+  - 工作会话里的时间日程、心情、进行中和刚结束的事、打算、她自己选的活动：固定。
+- **状态冻结要说清楚**：
+  - 后台暂停时，主会话和工作会话都带一段必留说明：心情、事件、内在状态和想法可能是旧的（`background:paused`）。
+  - 进行中的事件过了预计结束时间，会标“已超过预计结束时间，可能已经结束”（上下文和 `roleStateReadOnly` 都标）。
+- **工作会话刷新状态**：同一会话 5 分钟最多一次，后台刷新行为模式和内在状态的判断，不等它，下一步用上；后台暂停时不刷新。`moodPreReply` 只对等待中的聊天来信有用，工作会话不调用。
+- **段落按名字认**：`life:ended`、`life:intentions`、`life:style` 等，独处插件的是 `inner:state`、`inner:thoughts`、`inner:interests`。不再按优先级数字或文字开头判断。内在状态、想法、兴趣不再必留，优先级由 Gemini 通过 order 判断；Gemini 不可用时才用原来的优先级数字。
+- **4、5 交给 Gemini**（`lib/context-budget.js`）：
+  - 规划时给它上一步选过的资料（`previousOrder`），没有新情况尽量沿用。
+  - 新增 `timeGranularityMinutes`：由它决定时间精度（1、5、15、30、60 分钟），减少内容每步变动。
+  - 提示里写明外来记忆注入按当前任务给配额，无关时可以很少或为零。
+  - 上一轮技能目录和 3.4 万字记忆原样保留，多半是当时预算模型没给出结果（程序不擅自删外来内容）；这部分要等实际运行再看。
+- 测试：`test/work-context.test.js` 重写（5 项）。全量 632 项：623 通过，0 失败，9 项需要真实服务，自动跳过。独处插件 178 通过、1 项跳过。两项哈希检查 13 项、9 项 OK。没有发真实的 Gemini 请求验证新字段。
+- 备份：`lib/work-context.js`、`lib/engine.js`、`lib/shared-context.js`、`lib/host.js`、`lib/context-budget.js`、`test/work-context.test.js`、`README.md` 的 `.before-context-plan-20261108.bak`；抖音 `tests/work-guides.test.mjs` 同名备份。
+- 需要重启 DSH 生效。
+
+## 2026-11-08：新增查看当前全部状态的工具
+- 新工具 `censhu_current_state`（内容在新文件 `lib/current-state.js`）：时间和日程、行为模式、正在做的事、心情（含是否过期）、进行中的事件（超期标明）、刚结束的事件、打算、内在状态、想法、兴趣、私人打算、性格发展、天气、后台有没有暂停。
+- 只读：不调用模型、不刷新、不写记录。她自己的会话才能用（角色会话、工作会话、只读测试会话）。
+- 已加入 `ALWAYS_TOOLS`，每次请求都带；主会话和工作会话的上下文里各有一句必留说明，告诉她可以用它读取（`state:tool-hint`）。
+- 和 `censhu_life_context` 的区别：后者给的是拼好的上下文文本，绑定会话调用时还会先刷新；这个是结构化的全部状态，什么都不触发。
+- 测试：新增 `test/current-state.test.js`（2 项）；也用真实数据的临时副本跑过。全量 634 项：625 通过，0 失败，9 项需要真实服务，自动跳过。独处插件 178 通过，1 项跳过。
+- 备份：`lib/host.js`、`lib/work-context.js`、`lib/tool-bindings.js`、`lib/tool-semantics.js`、`README.md` 的 `.before-current-state-20261108.bak`；独处插件 `lib/tool-isolation.js` 同名备份。
+- 需要重启 DSH 生效。
+
+## 2026-11-08：再加 5 组伴随工具
+- 规则不变：选了 A 才带 B，其余工具仍由模型挑。固定工具没有增加。
+- `douyin_media_save` → `douyin_notice_view`、`douyin_chat_read`：收图要的 noticeId、messageId 从这两个工具来。
+- `douyin_notice_list` → `douyin_notice_view`：评论通知里的图只有它能看。
+- `douyin_chat_reply` → `douyin_chat_send`：图和话都要发时，先发图，再补一句。
+- `browser_interest` → `browser_task`、`browser_handoff`，这两个互相伴随：Terra 决定委派或亲自操作，都走得下去。
+- `browser_task`、`browser_handoff` → `browser_executor_advice`：任务中途可以再问 Terra。
+- `censhu_parallel_decide` → `subagent`：它只给建议，真要分头做靠 `subagent`。
+- 伴随会连锁：选任一个 `browser_task`、`browser_handoff`、`browser_progress`、`browser_steer`，这几个和 `browser_interest`、`browser_executor_advice` 都会带上。
+- 故意不加 `douyin_notice_view` → `douyin_notice_list`，否则选私信回复时会连带评论通知那一串工具。
+- 测试：`test/tool-bindings-1108.test.js` 新增 2 项。全量 636 项：627 通过，0 失败，9 项需要真实服务，自动跳过。两项哈希检查 13 项、9 项 OK。
+- 备份：`lib/tool-bindings.js`、`test/tool-bindings-1108.test.js`、`README.md` 的 `.before-more-companions-20261108.bak`。
+- 需要重启 DSH 生效。
+
+## 2026-11-08：上下文预算审查后的修改
+- **放宽校验**（`lib/context-budget.js`）：编号不存在、重复、列了必留项、取回线索有问题，都只去掉那一项；缺配额的按提供量算，真正放什么仍看 order。只有连 order 都没有才算失败。
+- **失败时沿用上一份决定**：同一会话、同一配置、一小时内的有效决定。上次没选的不放，上次没见过的保留，因为没人判断过它。
+- **等待按会话**：普通失败只让出错的会话等 30 秒；401、402、403、429 才让所有会话等 5 分钟。
+- **修正沿用记录**：外来资料的名字会重复，现在连来源和版本一起认；这份记录随会话清理。
+- **预算决定落盘**：`context-budget-log.jsonl`，超过 2 MB 换到 `.1`。只有名字和数字：方式、耗时、配额、保留了哪些资料的名字、Gemini 用了哪些工具、校验去掉了几项。
+- **删除没用的提示参数**：`budget.add` 不再接收提示文字。给其他插件用的 `budgetContext` 参数位置不变，提示文字直接忽略。
+- **Gemini 可以用只读工具**（新文件 `lib/budget-tools.js`，`lib/situation.js` 的 `googlePlanWithTools`）：
+  - `read_candidate` 看候选正文，`recent_activity` 看这个回合刚做了什么，`current_state` 看她此刻的全部状态。
+  - 只读，没有发送或写入的工具；最多两轮查看，第三轮只能用 `submit_plan` 提交。
+  - 时限从 12 秒放宽到 20 秒，输出上限也放宽。
+  - 接口拒绝这种请求（HTTP 400）时退回原来的结构化调用，并在一小时内不再尝试；模型没提交时只退回这一次。
+- **旧运行快照直接去掉**：不再作为候选，不看规划有没有成功，只改这次请求的副本，会话记录不动；认不出的形式不动。
+- **时间精度**：同一回合以第一次为准，换回合重新定。
+- **旧分镜**（新文件 `lib/request-media.js`）：抖音刷视频和重看会话里，成功翻到下一条或结束之后，之前的 `douyin_observe`、`douyin_video_zoom` 图片不再发给模型，换成一句说明；翻页失败不算。B站这边不处理。
+- **QQ 专用段**（`lib/work-context.js`）：【QQ 空间发布联动】【QQ 自主表达与发送】不再固定在抖音、B站、浏览器工作会话的系统提示里，改成候选，由 Gemini 判断。其他人设内容不动，QQ 会话和主会话也不变。
+- 测试：新增 `test/context-review-1108.test.js`（15 项），按新行为改了旧快照和校验的测试。全量 650 项：641 通过，0 失败，9 项需要真实服务，自动跳过。独处插件 177 通过、1 项跳过；主动进行 67 通过、13 项跳过。两项哈希检查 9 项、13 项 OK。工具循环用模拟接口测过，没有发真实的 Gemini 请求。
+- 备份：`lib/context-budget.js`、`lib/context-settings.js`、`lib/request-context.js`、`lib/situation.js`、`lib/work-context.js`、`lib/host.js`、改过的测试、`README.md` 的 `.before-context-review-20261108.bak`。
+- 需要重启 DSH 生效。
+
+## 2026-11-09：DSH 自带说明的处理
+- 只在她的会话里生效（主会话、工作会话、主动进行、独处，入口是 `host.js` 的 `assembleHer`），规则在 `lib/work-context.js` 的 `shapeHostPrompt`。只改这一次拼接的结果，DSH 本体和人设文件都不动。
+- **直接删除（和人设冲突）**：
+  - “You are an AI agent”“You are a coding agent”两句身份说明。
+  - Agent Teams 的协作说明和“你是 Team Lead”。工具本身还在。
+  - DSH 源码位置和 Web GUI 的开发说明（`harness:source`、`app:web-surface`）。
+  - 把青枔叫作“用户”的 DSH 说明：定时任务、`@` 路径、定时任务范围、workflow、输出排版。
+- **改成 Gemini 动态规划**：其余 DSH 使用说明（文件读写、命令行、后台任务、目标、子代理、MCP 等）移出系统提示，变成候选，放在请求末尾。选不选都不影响前面的缓存，系统提示保持稳定。规划失败时放得下就全放。
+- **留在原处**：网页内容不可信的提醒（`tool:web_search`、`tool:web_fetch`）；浏览器工作会话里的浏览器路由规则。
+- **称呼**：系统提示、生活上下文、工作做法、记忆和子代理说明里的“用户”“the user”改成“青枔”。路径里的 Users、记录里的 [user]、“抖音用户”这类词不动。
+- **没有改的**：长期知识、人物变化、engram 等记忆原文（改了就不是原始记录了），`memory:snapshot`、灵枢窗口，工具说明和技能目录。
+- 测试：新增 `test/host-prompt-1109.test.js`（7 项）。全量 657 项：648 通过，0 失败，9 项需要真实服务，自动跳过。独处插件 177 通过、1 项跳过；主动进行 67 通过、13 项跳过。两项哈希检查 9 项、13 项 OK。
+- 备份：`lib/work-context.js`、`lib/context-budget.js`、`lib/host.js`、`test/work-sessions.test.js`、`README.md` 的 `.before-host-guidance-20261109.bak`。
+- 需要重启 DSH 生效。
+
+## 2026-11-09：总说明工具 censhu_help
+- 新工具 `censhu_help`（新文件 `lib/help-tool.js`），已加入 `ALWAYS_TOOLS`，每次请求都带。遇到错误或不知道怎么做时查。
+- 不带参数就是总的完整说明：所有操作的用法、相关工具、MCP、子代理、技能写在一份里，太长时用 offset 接着读。
+- 也可以按需查（topic）：
+  - `operations`：按操作查，有定时任务、目标、workflow、文件读写、搜索、命令行、后台任务、子代理、MCP、输出和发送文件。
+  - `tools`：搜索工具，看某个工具的完整参数，也能载入这次没带的工具。
+  - `skills`、`mcp`、`subagents`、`guide`（DSH 使用说明）、`errors`（这个会话最近失败的调用）、`overview`（目录）。
+- 从上下文拿掉的 DSH 操作说明都留了一份在这里，不管 Gemini 这一步选没选，称呼已改成青枔。身份句、Agent Teams 和 DSH 开发说明不收录。
+- 只读：不调用模型、不执行其他工具。`load` 只是让下一次请求带上工具定义。
+- 主会话和工作会话的 `state:tool-hint` 里写了什么时候用它；主动进行和独处走 `assembleBudget`，有单独一句提示。
+- 独处插件 `lib/tool-isolation.js` 的只读名单也加了它。
+- 测试：新增 `test/help-tool-1109.test.js`（10 项）。全量 667 项：658 通过，0 失败，9 项需要真实服务，自动跳过。独处插件 177 通过、1 项跳过；主动进行 67 通过、13 项跳过。两项哈希检查 9 项、13 项 OK。
+- 备份：`lib/work-context.js`、`lib/host.js`、`lib/tool-bindings.js`、`lib/tool-semantics.js`、`README.md` 的 `.before-help-tool-20261109.bak`；独处插件 `lib/tool-isolation.js` 同名备份。
+- 需要重启 DSH 生效。
+
+## 2026-11-09：censhu_help 补上平台做法和 B站命令
+- 新增 `topic=platforms`：抖音（刷视频、社交、重看）、B站（刷视频、社交、重看）、浏览器的工作做法，以及 B站 `node bili.mjs` 的全部命令。在任何会话里都查得到。
+- 不带参数的总的完整说明也包含这些内容。
+- 工作做法直接取各插件登记的那份，内容和工作会话里固定带的一致，称呼已改成青枔。
+- 新增共享接口 `registerHelpDoc(名称, 提供函数)`，其他插件可以把自己的说明登记进来。
+- 测试：`test/help-tool-1109.test.js` 新增 2 项。全量 669 项：660 通过，0 失败，9 项需要真实服务，自动跳过。两项哈希检查 9 项、13 项 OK。
+- 备份：`lib/help-tool.js`、`lib/host.js`、`test/help-tool-1109.test.js`、`README.md` 的 `.before-help-platforms-20261109.bak`。
+- 需要重启 DSH 生效。
+
+## 2026-11-09 审查修复
+
+- `engram_facts` 带 `facts` 时算写入，要走审核；`engram_examine`、`engram_assess` 在她的会话里可用。
+- 第三方私信和评论进入长期知识时都是私人条目，只在私人生活会话可见。
+- “用户”只在明确指读者时才改成青枔，第三方内容和独处、生活事件原文不改。
+- 长期知识：读取到上限、或记录已从滚动日志淘汰，都不算被删除；来源重新出现时条目自动恢复。
+- 过滤操作者消息时不再按“诊断”两个字一刀切。
+- 同一任务里重复读网页、滚动、压缩上下文不再被拦。
+- `browser-browse-*` 工作会话不自动绑定成她和青枔的聊天。
+- 生活变化流只在记录真正被淘汰时才报缺口。
+
+## 2026-11-09：douyin_video_ask 的工具联动
+- `lib/tool-bindings.js`：选中 `douyin_video_ask` 时一起声明 `douyin_observe`，回答给出时间点后能直接去看那一处。
+- 备份：`lib/tool-bindings.js`、`README.md` 的 `.before-search-v2-20261109.bak`。
+- 需要重启 DSH 生效。
+
+## 2026-11-09：长期知识建库前的修复，写回语境和用量记录
+**知识整理**（`lib/knowledge/consolidate.js`、`sources.js`）
+- 新旧按事情发生的时间判断。模型只说两条记忆是什么关系，谁早谁晚由代码比较；较早的来源不能取代或覆盖较晚的知识，只记成旧说法或较早的阶段。缺时间时按模型判断，并在历史里记 `timeBasis:'unknown'`。
+- 各记忆库的来源都尽量带上事件时间；写回记录优先用来信时间。同一可信层内先处理旧的。候选带时间，并用 `laterCandidateIds` 标出比当前来源更晚的候选。
+- 一条坏决定不再拒掉整批。同一来源连续失败 3 次后等 7 天或等文字变化，不再堵住队列；网络和余额问题不计次数。
+- 同批来源可用 `peerSourceKey` 互相引用；内容完全相同的只判断一次，其余记为重复。
+- 已被取代的条目不再作为候选，进展也不能让它复活。
+- 被更正或推进时保留最多 3 条旧说法（`priorValues`），查询和上下文里都看得到。
+
+**按时间回忆**：`censhu_knowledge_recall` 新增 `when`，也会从问题里识别时间，例如上个月、上周三、10月3日、最近三天（`lib/knowledge/time-range.js`，只用规则）。问题里的时间查不到结果时，会去掉时间限制再查一次。
+
+**回放**（`replay.js`、`evaluate.js`）：新增只给聊天实际能看到内容的线上组，只报分数；新增记录倒序到达的检查（`checksReversed`），不参与策略门控；回查和候选用本地向量，不增加付费嵌入。
+
+**记忆写回**（`lib/memory-writeback.js`、`lib/writeback-context.js`）
+- 来信等 15 分钟再审，审核时带上前 3 条和后 6 条对话，后续改口能被读到。`quote` 仍只能取自来信原文。
+- 每条记忆标 `stance`（事实、主观判断、一时感受），写入时注明主观判断和感受，并记录来信时间。
+- 自己的观看笔记不等待，也不带对话。
+
+**用量记录**（`lib/gemini-telemetry.js`、`situation.js`、`terra-review.js`）
+- 每次调用记录 token、模型版本、结束原因、提示词指纹。一次请求和一次联系复核的调用共用 `trace`。
+- 被暂停拦下的调用记一行 `status:'paused'`。主模型每回合用量写入 `cen-shu-life/main-usage.jsonl`。
+
+**余额暂停**（`lib/gemini-pause.js`）：402/401/403 的自动暂停写入控制文件，所有 DSH 进程共用，成功一次后全部解除。
+
+- 2026-11-09 排查写回 0 条事实：不是故障。那段时间绑定会话几乎没有新消息，已审的都是短聊天；知识层是 11-06 才加入的，后台 11-05 起暂停，所以索引还没建。
+- 没有真实模型调用验证过上述改动；模型会不会用好 `peerSourceKey`、`stance` 和时间标记，要等恢复运行后看回放结果。
+- 备份：相关文件的 `.before-next-batch-20261109.bak`。需要重启 DSH 生效。
+
+## 2026-11-09：跨经历归纳、只读报告和人设探针
+**核心判断交给模型**：下面的归纳、重复判断、关系整理和探针评分都由 Gemini（评分和归纳审核另有 Terra）完成，程序只采集资料、核对引用的编号和保存结果。
+
+- **跨经历归纳**（`lib/knowledge/synthesis.js`，设置项 `knowledgeSynthesis`，默认开）：Gemini 从同一主体的多条共享知识里归纳长期模式，Terra 独立审核后才写入知识索引。多久再看由模型决定；没有配置 Terra 时不写入。私人条目不参与。
+- **慢层可选字段**（`lib/mood-undertone.js`）：累积感受可带 `appraisal`（碰到了什么、谁造成、能否改变）和 `coping`（怎么对待这份感受），看不清时模型可省略，无效值只丢弃。性格段带上最近三次变化的来由。
+- **分功能模型**（`featureModels`，默认空）：只有 `TIERABLE_FEATURES` 里的短分类能单独换模型，抽取和判断不下放。名字含 lite 的模型不发 `thinkingConfig`。没有真实 token 数据前默认不启用。
+- **只读报告**：`node scripts/censhu-report.mjs [all|repetition|relationship|contacts] [--dry] [--json]`。重复度由 Gemini 区分新认识、后续、换句话重复；关系账本整理节点、未解开的事、未兑现的话和当前阶段，每条都带来源编号，对不上的丢弃。结果只打印，不写回。
+- **人设探针与消融**：`node scripts/censhu-probe.mjs` 预览，`run` 才调用模型，`report` 看结果，`rate` 盲评，`calibration` 看累积进度和一致度。只在真实数据的临时副本上组装上下文，按层去掉资料；独处资料过期时自动选资料还有效的时间点。回复用 Gemini 生成，比较的是各层的相对差异，不代表线上主模型的绝对表现。
+- **借鉴**：探针量规参考 PHASE-Tree 的 persona_rubric 和 Abdulhai 的 prompt-to-line，题目分类参考 Persistent Personas?；都是重写的中文，没有整段照搬外部代码或提示词。
+- **模式设置为什么不生效**（2026-11-09 核对）：2026-10-30 起生活行为由 `LifeDirector`（Gemini 判断、Terra 复核）决定，创建后 `engine.director` 总是存在，`chooseMode`、阈值、`careFallback` 和 `modeRules` 文本只在“模拟”里使用；`modeRules` 还作为每日内容生成的参考。这是设计变化，不是故障，设置页的文字还没跟上。
+- 备份：相关文件的 `.before-batch-three-20261109.bak`。需要重启 DSH 生效。
+
+## 2026-11-09：回放扩题、感受分离、话头渠道和检索说明
+- **回放**（`lib/knowledge/synthetic.js`、`evaluate.js`）：生成题新增偏好、隐含关联、长程三类；策略切换要同时比较 3 套题；答错的题由 Gemini 判断问题出在提取、更新、检索、作答还是题目本身（做法参考 HaluMem），结果在 `replay.attribution`。
+- **感受分离**（`sources.js`、`consolidate.js`）：读取记忆时把“当时的感受”分出来，不进文字匹配和 hash，知识条目单独保留最多 8 条感受。
+- **慢层校验**（`lib/mood-undertone.js`）：累积感受引用的情绪编号和记录编号必须真实存在，对不上的丢弃；提示词写明上一次的判断不算新证据。
+- **需求驱动回忆**（`lib/memory-selection.js`）：排序前先让 Gemini 想青枔此刻需要什么。
+- **话头渠道**（`lib/host.js`、`semantic-mentions.js`）：所有 QQ 发送工具都算提及，并记录是 QQ 还是桌面。
+- **避免重复**（`lib/qq-grounding.js`）：QQ 审核对照她最近发过的话，换说法重复且没有新内容才算机械重复，不设相似度阈值。
+- **检索说明**（`salience.js`）：`censhu_knowledge_recall` 的结果标明字面命中或只是意思相近，由她判断；`includeRaw` 可一起返回原始记录。不设分数下限。
+- **三分视图**（`lib/plan-view.js`）：`censhu_current_state` 新增 `plan`，分开列原计划、当前打算、实际发生和各渠道说过的事，结构借鉴 PersonaLife。
+- 备份：相关文件的 `.before-batch-four-20261109.bak`。需要重启 DSH 生效。
+
+## 2026-11-09：第五批
+- **上下文预算**（`lib/context-budget.js`）：历史上限裁掉的回合，它们的记忆注入不再算候选资料；沿用上一份决定不再刷新一小时时限；规划失败时旧回合的 `current_user_request` 也标成历史。
+- **主观判断**（`lib/knowledge/consolidate.js`、`sources.js`、`salience.js`）：知识条目新增 `stance`，由 Gemini 判断是事实、主观判断还是一时的感受，写回审核标过的来源会带上；读取时写明“不是已证实的事实”（思路来自 MIST、PersistBench）。
+- **回放判定力**（`lib/knowledge/evaluate.js`）：切换策略前至少比较 60 道配对题，最多 8 套，生成失败时不用内置题凑数。只在评估时多花费。
+- **只读报告**（`scripts/censhu-report.mjs`）：`writeback` 写回漏斗和 Gemini 漏记抽查（参考 HaluMem 的完整度）；`trends` 心情走向由 Gemini 归类，使用时长和深夜占比按消息时间计算。结果不喂回模型。
+- **探针**（`lib/probes`）：新增“需要安慰”6 题和 3 段 10 轮长聊，报告长聊末尾相对开头的变化，以及安慰时偏陪伴还是偏分析。
+- **遥测**（`lib/gemini-telemetry.js`）：调用文件新增按天累计，不受 500 行上限影响，外部模型页的每日用量从这里读。
+- 备份：相关文件的 `.before-batch-five-20261109.bak`。需要重启 DSH 生效。
+
+## 2026-11-09：一周观看回顾
+- `shared-context.js` 新增 `recordWatchRecap`：抖音插件每周写好的观看回顾由这里接收，和单条观看感受走同一条路（观看印象、心情事件、记忆审核），同一周不重复。
+- 测试：`test/watch-recap.test.js`。后台暂停期间不会触发，真实运行要等后台恢复。备份 `lib/shared-context.js.before-round4-20261109.bak`。
+
+## 2026-11-09：第六批
+- **截断和空回复**（`lib/situation.js`、`lib/gemini-telemetry.js`）：区分输出被截断、被拦下和空回复，记进遥测并显示在外部模型页。结构化请求被截断时自动用三倍上限重试一次，上限 16000。
+- **进展连接**（`lib/knowledge/consolidate.js`）：提示词写明，较早的来源是较晚知识的前情时仍算 progress，由程序记成较早的阶段。
+- **节奏**（`lib/rhythm.js`）：节奏判断能看到电脑此刻的状态，只作参考，也不会因为空闲时间变化而重新判断。
+- 主动联系结果的汇总移到 `lib/reports/contacts.js`，命令行和设置页共用。
+- 审读了 `context-recall.js`、`tool-bindings.js`、`request-skills.js`、`request-originals.js`、`budget-tools.js`，没有发现需要修的问题。
+- 备份：相关文件的 `.before-batch-six-20261109.bak`。需要重启 DSH 生效。
+
+## 2026-11-09：用模型代替人工判断
+- **盲选对比**（`lib/probes/harness.js`）：同一题的完整上下文和去掉某层的回复随机排成 A、B，Gemini 和 Terra 各自选哪条更像档案里的她。
+- **对照组**：每次运行多跑一组和完整上下文条件相同的 `full-again`，它的差异就是噪声；同时统计两家模型的一致度。
+- **分层结论**：Gemini 和 Terra 各自判断“保留、可以精简、看不出”，一致才算结论，否则记为看不出。只出报告，不会自动关掉任何层。`censhu-probe.mjs verdict` 可对最新运行重新下结论。
+- **下一步优先级**（`lib/reports/priorities.js`）：模型读两份报告、改动记录和运行数据来排，Terra 复核，不会重新提青枔已否决的事；没有运行数据时不排。`censhu-report.mjs priorities`。
+- 人工盲评保留为可选，不再是下结论的前提。备份：相关文件的 `.before-batch-seven-20261109.bak`。
+
+## 2026-11-09：更多判断交给模型
+- **记忆写回**：Gemini 判断 keep 后不再用置信度和重要度分数线二次筛选，只核对原文逐字出现（独处日记的记忆同样）。关闭动态判断时仍按原分数线。
+- **夜间**：画画和生成事件不再限定时段，节奏判断也不再有 02:00–06:00 的硬限制，由模型结合时间和作息决定。
+- **置信度**：情境、心情联动、定时事件、人物学习不再用模型自报分数做门槛，看模型给出的 clear、uncertain 等判断。
+- **时间说法**：`censhu_knowledge_recall` 的 `when` 先走规则，解析不了时由 Gemini 换算，失败则不加时间条件。
+- 备份：相关文件的 `.before-batch-eight-20261109.bak`。需要重启 DSH 生效。
+
+## 2026-11-09：独处节奏、回忆候选和性格证据交给模型
+- **节奏判断新增 4 项**（`lib/rhythm.js`）：独处休息开始 / 结束（`innerQuietStartHour`、`innerQuietEndHour`，相同表示不休息）和今天独处的注意判断 / 独处回合次数（`innerJudgmentsDaily` 0–24、`innerReflectionsDaily` 0–12，必须是整数）。提示词写明独处休息同样没有固定值。输入里带上独处今天已用的次数，但这个计数不参与“是否需要重新判断”的比较。
+- **按意思排序候选**（新增 `lib/knowledge/semantic-rank.js`，共享接口 `semanticRank`）：字面重叠 + 本机 bge-small-zh 向量，按排名融合，给独处的问题回忆用。只在本机计算，不花钱，Gemini 暂停时也能用；向量缓存在 `knowledge/recall-vectors.json`，不碰知识层的 `vectors.json`，超过 8000 条时只保留当前用到的。最终选哪条仍由模型判断。
+- **会话记忆采集不再要求写名字**（`lib/persona-evolution.js` `captureMemoryContexts`）：以前只写“她 / 我”的会话记忆在采集时就被丢掉，到不了 Gemini 的证据排序（`selectPersonaEvidence`，本来就不按名字过滤）。现在一并采集，由 Gemini 判断；超出 32 条或 6000 字时先丢最旧的未写名字条目。Gemini 失败时的兜底（`readPersonaEvidence`）仍只用写了“岑舒 / 青枔”的条目，避免没有模型把关时混进无关内容。提炼和审核提示词（`lib/persona-learning.js`）补充：代称条目要能从原文和来源确定主体，确定不了就略过或判 uncertain。
+- 测试：`test/gemini-four-1109.test.js`。备份：相关文件的 `.before-gemini-four-20261109.bak`。需要重启 DSH 生效。

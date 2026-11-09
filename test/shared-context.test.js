@@ -56,3 +56,24 @@ test('browser interest reads fresh bound thoughts and excludes other sessions an
  const now=Date.now();let thought='喜欢线条';const e={now:()=>now,config:{enabled:true,context:true,contentEvolutionEnabled:true,lifePlanningEnabled:true},bound:id=>id==='main',state:{active:[],mode:{id:'pleased'}},history:{events:[],mentions:[]},activeContent:()=>({intentions:[{id:'i',text:'想画门窗',priority:1,templateIds:[],validFrom:now-1,expiresAt:now+60000},{id:'old',text:'已过期',priority:1,templateIds:[],validFrom:now-100,expiresAt:now-1}]}),read:()=>({recent:[{sessionId:'main',at:now,text:'聊过窗花'},{sessionId:'other',at:now,text:'其他会话'}]}),innerLifePlanning:()=>({thoughts:[{subject:'门窗',summary:thought}],records:[{intention:'晚点画一张'}]})};
  const shared=sharedLifeContext(e);assert.equal(shared.browserInterests({sessionId:'other'}),null);const a=shared.browserInterests({sessionId:'main'});assert.deepEqual(a.recent,['聊过窗花']);assert.equal(a.intentions.length,1);assert.deepEqual(a.privatePlans,['晚点画一张']);thought='想研究木纹';assert.equal(shared.browserInterests({sessionId:'main'}).thoughts[0].view,thought);
 });
+
+test('current mixed mood reaches Pet snapshots, video choice and browser interest inputs after disk update',()=>{
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'mood-surfaces-'));try{
+ const now=Date.now(),e=new LifeEngine({home,now:()=>now});e.saveConfig({sessionIds:['main'],semanticEnabled:false});
+ const dir=path.join(home,'feiyu-mood');fs.mkdirSync(dir);fs.writeFileSync(path.join(dir,'config.json'),JSON.stringify({slots:[{id:'censhu',sessions:['main']}]}));
+ const save=(label,score)=>fs.writeFileSync(path.join(dir,'state.json'),JSON.stringify({version:2,moods:{censhu:{mood:score,dims:{happy:2,calm:1,sweet:0,heartache:0,worry:4,sad:0,jealous:0},lastReason:'旧书受潮',lastConfidence:95,updatedAt:now,mixedMood:{label,components:[],expiresAt:now+60000}}}}));
+ save('开心又担心',71);const service=sharedLifeContext(e,{});
+ assert.match(service.snapshot({sessionId:'main'}).context,/开心又担心/);
+ assert.equal(service.douyinContext().mood.mixedMood.label,'开心又担心');assert.equal(service.browserInterests({sessionId:'main'}).moodState.qualitative,true);assert.equal(service.browserInterests({sessionId:'main'}).moodState.dimensions,undefined);
+ save('稍微放下心',72);assert.match(service.snapshot({sessionId:'main'}).context,/稍微放下心/);assert.equal(service.douyinContext().mood.mixedMood.label,'稍微放下心');assert.equal(service.douyinContext().mood.score,undefined);
+ const parts=[];e.context('main',{parts});assert.ok(parts.some(p=>p.key==='mood:current'&&p.text.includes('稍微放下心')),'shared budget receives the actual current mood item');
+ }finally{fs.rmSync(home,{recursive:true,force:true});}
+});
+test('both mood features explicitly select Gemini 3.8 Flash while unrelated models stay unchanged',async()=>{
+ const home=fs.mkdtempSync(path.join(os.tmpdir(),'mood-model-'));try{
+ const e=new LifeEngine({home});e.config.semanticModel='other-model';e.config.semanticEnabled=true;
+ const shared=sharedLifeContext(e,{}),urls=[];
+ for(const feature of ['mood-numeric','mood-blend','other'])await shared.judge('fixture',null,{}, {feature,keyReader:async()=> 'test-only',fetcher:async(url)=>{urls.push(url);return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:'ok'}]}}]})};}});
+ assert.match(urls[0],/gemini-3\.8-flash/);assert.match(urls[1],/gemini-3\.8-flash/);assert.match(urls[2],/other-model/);
+ }finally{fs.rmSync(home,{recursive:true,force:true});}
+});

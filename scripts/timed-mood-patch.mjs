@@ -1,4 +1,5 @@
 export function patchTimedMood(source){
+ if(source.includes("// cen-shu-life dynamic-background v2"))return source;
  source=patchLifeStep(source).replace('offs.push(ctx.interval(ordinaryMoodTick,3000));ordinaryMoodTick()','offs.push(ctx.interval(ordinaryMoodTick,3000))');
  source=source.replace("recordLifeMoodReceipts(s,delta);saveState(key,s)\n        diag('生活事件独立判断","recordLifeMoodReceipts(s,delta);if(step===0&&!anyDim){s.lastReason=delta.reason;s.lastConfidence=delta.confidence;s.updatedAt=Date.now()}saveState(key,s)\n        diag('生活事件独立判断");
  if(source.includes('// cen-shu-life ordinary-native v1'))return source;

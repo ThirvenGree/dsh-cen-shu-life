@@ -17,13 +17,13 @@ function fixture(){
  }});
  const assemble=()=>budget.add({contexts:[],sections:[],tools:[]},agent,'contexts','cen-shu-life',[
   {required:true,key:'identity',text:required},{key:'weather:today',text:weather},{owner:'inner',key:'diary:window',text:diary}
- ],'可按需回忆');
+ ]);
  const call=args=>JSON.parse(budget.recallTool().execute(args,{agent}));
  const catalog=()=>{const result=call({action:'catalog'});assert.equal(result.status,'ready');return result;};
  const ref=()=>{const result=catalog();const item=result.entries.find(row=>row.key==='diary:window');return {snapshotId:result.snapshotId,version:result.version,itemId:item.itemId,itemVersion:item.version};};
  const read=(entry,offset=0,limit=4000)=>{const {itemVersion,...args}=entry;const result=call({action:'read',...args,offset,limit});assert.equal(result.status,'ready');return result;};
  const chosen=result=>assert.equal(result.contexts.find(row=>row.name==='cen-shu-life').text,required+'\n'+weather,'recall must not remove model-selected data');
- const hint=result=>result.sections.find(row=>row.name==='censhu-context-recall');
+ const hint=result=>(result.contexts||[]).find(row=>row.name==='censhu-context-recall');
  return {budget,agent,inputs,assemble,call,catalog,ref,read,chosen,hint,
   topic(value){topic=value;},model(value){model=value;},history(value){history=value;},diary(value){diary=value;}};
 }
